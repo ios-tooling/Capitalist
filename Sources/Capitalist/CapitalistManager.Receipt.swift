@@ -4,9 +4,10 @@
 
 import Foundation
 import StoreKit
+import Studio
 
 extension CapitalistManager {	
-	func currentExpirationDate(for productIDs: [Product.ID] = CapitalistManager.instance.allProductIDs) -> Date? {
+	public func currentExpirationDate(for productIDs: [Product.ID] = CapitalistManager.instance.allProductIDs) -> Date? {
 		var newest: Date?
 
 		for id in productIDs {
@@ -18,7 +19,7 @@ extension CapitalistManager {
 		return newest
 	}
 	
-	func isInTrial(for productIDs: [Product.ID]) -> Bool {
+	public func isInTrial(for productIDs: [Product.ID]) -> Bool {
 		return self.availableProducts.values.filter({ productIDs.contains($0.id) && $0.isInTrialPeriod }).count > 0
 	}
 	
@@ -45,7 +46,7 @@ extension CapitalistManager {
 	public class Receipt: NSObject {
 		public static var appSpecificSharedSecret: String!			//this should be found in AppStoreConnect
 		public var isRefreshing = false
-		var cachedReciept: [String: Any]?
+		public var cachedReciept: [String: Any]?
 		var currentCheckingHash: Int?
 		
 		public override init() {
@@ -82,7 +83,7 @@ extension CapitalistManager {
 					self.isRefreshing = false
 					self.updateCachedReciept()
 					DispatchQueue.main.async {
-						Notifications.didRefreshReceipt.post()
+						Notifications.didRefreshReceipt.notify()
 						completion?(nil)
 					}
 				}
@@ -105,7 +106,7 @@ extension CapitalistManager {
 			}
 			
 			self.currentCheckingHash = hash
-			let dict: [String: Any] = ["receipt-data": receiptData.base64EncodedString(), "password": Receipt.appSpecificSharedSecret, "exclude-old-transactions": true]
+			let dict: [String: Any] = ["receipt-data": receiptData.base64EncodedString(), "password": Receipt.appSpecificSharedSecret ?? "", "exclude-old-transactions": true]
 			let url = URL(string: "https://\(CapitalistManager.instance.useSandbox ? "sandbox" : "buy").itunes.apple.com/verifyReceipt")!
 			var request = URLRequest(url: url)
 			request.httpBody = try! JSONSerialization.data(withJSONObject: dict, options: [])
@@ -113,7 +114,7 @@ extension CapitalistManager {
 			
 			let task = URLSession.shared.dataTask(with: request) { result, response, error in
 				if let err = error { print("Error when validating receipt: \(err)") }
-				if let data = result, let info = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any], let status = info?["status"] as? Int {
+				if let data = result, let info = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any], let status = info["status"] as? Int {
 					if status == 21007, !CapitalistManager.instance.useSandbox { // if the server sends back a 21007, we're in the Sandbox. Happens during AppReview
 						CapitalistManager.instance.useSandbox = true
 						self.currentCheckingHash = nil

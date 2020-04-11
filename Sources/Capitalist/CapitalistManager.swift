@@ -93,13 +93,13 @@ public class CapitalistManager: NSObject {
 			return false
 		}
 
-		Notifications.startingProductPurchase.post()
+		Notifications.startingProductPurchase.notify()
 		
 		self.purchaseCompletion = completion
 		self.purchaseQueue.async {
 			if product.id.kind == .nonConsumable, self.hasPurchased(product.id) {
 				self.purchaseCompletion?(product, nil)
-				Notifications.didPurchaseProduct.post()
+				Notifications.didPurchaseProduct.notify()
 				return
 			}
 			
@@ -128,22 +128,22 @@ public class CapitalistManager: NSObject {
 				self.receipt.refresh() { error in
 					completion?(product, nil)
 					self.state = .idle
-					Notifications.didPurchaseProduct.post()
+					Notifications.didPurchaseProduct.notify()
 				}
 			} else {
 				completion?(product, nil)
 				self.state = .idle
-				Notifications.didPurchaseProduct.post()
+				Notifications.didPurchaseProduct.notify()
 			}
 		}
 	}
 	
-	func product(from id: Product.ID?) -> Product? {
+	public func product(from id: Product.ID?) -> Product? {
 		guard let id = id else { return nil }
 		return self.availableProducts[id]
 	}
 	
-	func productID(from string: String?) -> Product.ID? {
+	public func productID(from string: String?) -> Product.ID? {
 		return self.allProductIDs.filter({ $0.rawValue == string }).first
 	}
 }
@@ -165,6 +165,9 @@ extension CapitalistManager: SKPaymentTransactionObserver {
 				SKPaymentQueue.default().finishTransaction(transaction)
 				
 				
+			@unknown default:
+				self.failPurchase(of: self.product(from: self.productID(from: transaction.payment.productIdentifier)), dueTo: transaction.error)
+				SKPaymentQueue.default().finishTransaction(transaction)
 			}
 		}
 	}
@@ -181,9 +184,9 @@ extension CapitalistManager: SKPaymentTransactionObserver {
 		self.purchaseCompletion = nil
 
 		if self.state == .purchasing(prod) {
-			var userInfo = error != nil ? ["error": error!] : nil
+			var userInfo: [String: Any]? = error != nil ? ["error": error!] : nil
 			if let err = error as? SKError, err.code == .paymentCancelled || err.code == .paymentNotAllowed { userInfo = nil }
-			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: prod, userInfo: userInfo)
+			Notifications.didFailToPurchaseProduct.notify(prod, info: userInfo)
 			self.state = .idle
 		}
 
@@ -244,7 +247,7 @@ extension CapitalistManager: SKProductsRequestDelegate {
 		
 		self.receipt.updateCachedReciept()
 		self.purchaseQueue.resume()
-		Notifications.didFetchProducts.post()
+		Notifications.didFetchProducts.notify()
 	}
 }
 
@@ -269,16 +272,16 @@ extension CapitalistManager {
 
 
 extension CapitalistManager {
-	struct Notifications {
-		static let didFetchProducts = Notification.Name("CapitalistManager.didFetchProducts")
-		static let didRefreshReceipt = Notification.Name("CapitalistManager.didRefreshReceipt")
+	public struct Notifications {
+		public static let didFetchProducts = Notification.Name("CapitalistManager.didFetchProducts")
+		public static let didRefreshReceipt = Notification.Name("CapitalistManager.didRefreshReceipt")
 
-		static let startingProductPurchase = Notification.Name("CapitalistManager.startingProductPurchase")
-		static let didPurchaseProduct = Notification.Name("CapitalistManager.didPurchaseProduct")
-		static let didFailToPurchaseProduct = Notification.Name("CapitalistManager.didFailToPurchaseProduct")
+		public static let startingProductPurchase = Notification.Name("CapitalistManager.startingProductPurchase")
+		public static let didPurchaseProduct = Notification.Name("CapitalistManager.didPurchaseProduct")
+		public static let didFailToPurchaseProduct = Notification.Name("CapitalistManager.didFailToPurchaseProduct")
 
-		static let startingProductTrial = Notification.Name("CapitalistManager.startingProductTrial")
-		static let didTrialProduct = Notification.Name("CapitalistManager.didTrialProduct")
-		static let didFailToTrialProduct = Notification.Name("CapitalistManager.didFailToTrialProduct")
+		public static let startingProductTrial = Notification.Name("CapitalistManager.startingProductTrial")
+		public static let didTrialProduct = Notification.Name("CapitalistManager.didTrialProduct")
+		public static let didFailToTrialProduct = Notification.Name("CapitalistManager.didFailToTrialProduct")
 	}
 }
