@@ -63,24 +63,27 @@ extension CapitalistManager {
 		let id: CapitalistManager.Product.ID
 		let product: SKProduct
 		
-		var expirationReason: ExpirationReason? {
+		public var expirationReason: ExpirationReason? {
 			guard let reason = self.info?["expiration_intent"] as? Int else { return nil }
 			return ExpirationReason(rawValue: reason)
 		}
-		var isInBillingRetryPeriod: Bool { return Bool(any: self.info?["is_in_billing_retry_period"]) }
-		var isInIntroOfferPeriod: Bool { return Bool(any: self.info?["is_in_intro_offer_period"]) }
-		var isInTrialPeriod: Bool { return Bool(any: self.info?["is_trial_period"]) }
-		var subscriptionCancellationDate: Date? { return self.date(for: "cancellation_date") }
-		var subscriptionExpirationDate: Date? { return self.date(for: "expires_date") }
-		var originalPurchaseDate: Date? { return self.date(for: "original_purchase_date") }
-		var hasUsedTrial: Bool { return self.isInTrialPeriod || self.isInIntroOfferPeriod || self.originalPurchaseDate != nil }
-		var isSubscriptionActive: Bool {
+		
+		public var rawPrice: Double { return self.product.price.doubleValue }
+		public var price: NSDecimalNumber { return self.product.price }
+		public var isInBillingRetryPeriod: Bool { return Bool(any: self.info?["is_in_billing_retry_period"]) }
+		public var isInIntroOfferPeriod: Bool { return Bool(any: self.info?["is_in_intro_offer_period"]) }
+		public var isInTrialPeriod: Bool { return Bool(any: self.info?["is_trial_period"]) }
+		public var subscriptionCancellationDate: Date? { return self.date(for: "cancellation_date") }
+		public var subscriptionExpirationDate: Date? { return self.date(for: "expires_date") }
+		public var originalPurchaseDate: Date? { return self.date(for: "original_purchase_date") }
+		public var hasUsedTrial: Bool { return self.isInTrialPeriod || self.isInIntroOfferPeriod || self.originalPurchaseDate != nil }
+		public var isSubscriptionActive: Bool {
 			guard let expirationDate = self.subscriptionExpirationDate else { return false }
 			return expirationDate > Date()
 		}
 		
-		var quantity: Int { return Int(any: self.info?["quantity"] ?? "") }
-		var hasPurchased: Bool {
+		public var quantity: Int { return Int(any: self.info?["quantity"] ?? "") }
+		public var hasPurchased: Bool {
 			switch self.id.kind {
 			case .none: return false
 			case .nonConsumable: return self.quantity > 0
