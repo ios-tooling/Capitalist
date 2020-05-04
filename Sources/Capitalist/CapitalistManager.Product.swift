@@ -37,7 +37,7 @@ extension CapitalistManager {
 		public var description: String {
 			var text = self.id.rawValue + " - " + self.id.kind.rawValue
 			if let reason = self.expirationReason { text += ", Expired: \(reason)" }
-			if #available(iOS 11.2, *) {
+			if #available(iOS 11.2, OSX 10.13.2, *) {
 				if !self.hasUsedTrial, self.product.introductoryPrice != nil { text += " can trial" }
 			}
 			if self.isInTrialPeriod { text += " in trial" }
