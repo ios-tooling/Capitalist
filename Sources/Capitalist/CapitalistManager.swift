@@ -87,6 +87,7 @@ public class CapitalistManager: NSObject {
 	}
 
 	public func canPurchase(_ id: Product.ID) -> Bool {
+		if self.state != .idle, self.state != .restoring { return false }
 		guard !id.isPrepurchased, let product = self.product(for: id) else { return false }
 		
 		switch product.id.kind {
@@ -109,6 +110,7 @@ public class CapitalistManager: NSObject {
 			return false
 		}
 
+		self.state = .purchasing(product)
 		Notifications.startingProductPurchase.notify()
 		
 		self.purchaseCompletion = completion
@@ -118,9 +120,7 @@ public class CapitalistManager: NSObject {
 				Notifications.didPurchaseProduct.notify()
 				return
 			}
-			
-			self.state = .purchasing(product)
-			
+					
 			self.purchaseTimeOutTimer = Timer.scheduledTimer(withTimeInterval: self.purchaseTimeOut, repeats: false) { _ in
 				self.failPurchase(of: product, dueTo: CapitalistError.requestTimedOut)
 			}
@@ -194,18 +194,19 @@ extension CapitalistManager: SKPaymentTransactionObserver {
 			return
 		}
 		
+		let completion = self.purchaseCompletion
 		self.waitingPurchases.remove(prod.id)
 		
-		self.purchaseCompletion?(product, error)
 		self.purchaseCompletion = nil
 
 		if self.state == .purchasing(prod) {
 			var userInfo: [String: Any]? = error != nil ? ["error": error!] : nil
 			if let err = error as? SKError, err.code == .paymentCancelled || err.code == .paymentNotAllowed { userInfo = nil }
-			Notifications.didFailToPurchaseProduct.notify(prod, info: userInfo)
 			self.state = .idle
+			Notifications.didFailToPurchaseProduct.notify(prod, info: userInfo)
 		}
 
+		completion?(product, error)
 		print("Failed to purchase \(prod), \(error?.localizedDescription ?? "no error description").")
 	}
 }
