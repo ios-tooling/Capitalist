@@ -14,6 +14,10 @@ import Studio
 
 typealias ReceiptCompletion = ([String: Any]?) -> Void
 
+public protocol CapitalistManagerDelegate: class {
+	func didFetchProducts()
+}
+
 public class CapitalistManager: NSObject {
 	public static let instance = CapitalistManager()
 
@@ -24,6 +28,7 @@ public class CapitalistManager: NSObject {
 	public var useSandbox = !Gestalt.isProductionBuild
 	public var allProductIDs: [Product.ID] = []
 	public var purchaseTimeOut = TimeInterval.minute * 2
+	public weak var delegate: CapitalistManagerDelegate?
 	
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
 
@@ -81,6 +86,17 @@ public class CapitalistManager: NSObject {
 		return self.availableProducts[id]
 	}
 
+	public func canPurchase(_ id: Product.ID) -> Bool {
+		guard !id.isPrepurchased, let product = self.product(for: id) else { return false }
+		
+		switch product.id.kind {
+		case .consumable: return true
+		case .nonConsumable: return !self.hasPurchased(id)
+		case .subscription: return self.currentExpirationDate(for: [id]) == nil
+		case .none: return false
+		}
+	}
+	
 	@discardableResult
 	public func purchase(_ id: Product.ID, completion: ((Product?, Error?) -> Void)? = nil) -> Bool {
 		guard let product = self.product(for: id) else {
@@ -248,40 +264,7 @@ extension CapitalistManager: SKProductsRequestDelegate {
 		self.receipt.updateCachedReciept()
 		self.purchaseQueue.resume()
 		Notifications.didFetchProducts.notify()
+		self.delegate?.didFetchProducts()
 	}
 }
 
-extension CapitalistManager {
-	public enum CapitalistError: String, Error, LocalizedError, CustomStringConvertible {
-		case productNotFound, purchaseAlreadyInProgress, requestTimedOut
-		public var localizedDescription: String { return self.rawValue }
-		public var description: String { return self.rawValue }
-	}
-	
-	public enum State: Equatable { case idle, fetchingProducts, purchasing(Product), restoring
-		public static func ==(lhs: State, rhs: State) -> Bool {
-			switch (lhs, rhs) {
-			case (.idle, .idle): return true
-			case (.fetchingProducts, .fetchingProducts): return true
-			case (.purchasing(let lhProd), .purchasing(let rhProd)): return lhProd == rhProd
-			default: return false
-			}
-		}
-	}
-}
-
-
-extension CapitalistManager {
-	public struct Notifications {
-		public static let didFetchProducts = Notification.Name("CapitalistManager.didFetchProducts")
-		public static let didRefreshReceipt = Notification.Name("CapitalistManager.didRefreshReceipt")
-
-		public static let startingProductPurchase = Notification.Name("CapitalistManager.startingProductPurchase")
-		public static let didPurchaseProduct = Notification.Name("CapitalistManager.didPurchaseProduct")
-		public static let didFailToPurchaseProduct = Notification.Name("CapitalistManager.didFailToPurchaseProduct")
-
-		public static let startingProductTrial = Notification.Name("CapitalistManager.startingProductTrial")
-		public static let didTrialProduct = Notification.Name("CapitalistManager.didTrialProduct")
-		public static let didFailToTrialProduct = Notification.Name("CapitalistManager.didFailToTrialProduct")
-	}
-}

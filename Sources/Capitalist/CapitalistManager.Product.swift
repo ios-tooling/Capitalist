@@ -6,6 +6,13 @@ import Foundation
 import StoreKit
 
 extension CapitalistManager {
+	public func purchasePhase(of product: Product.ID) -> ProductPurchsePhase {
+		if product.isPrepurchased { return .prepurchased }
+		if self.isPurchasing(product) { return .purchasing }
+		if self.hasPurchased(product) { return .purchased }
+		return .idle
+	}
+	
 	public struct Product: CustomStringConvertible, Equatable {
 		public struct ID: Equatable, Hashable, CustomStringConvertible {
 			public enum Kind: String { case none, nonConsumable, consumable, subscription }
@@ -13,14 +20,16 @@ extension CapitalistManager {
 			public let rawValue: String
 			public let kind: Kind
 			public var description: String { return self.rawValue }
+			public let isPrepurchased: Bool
 
 			var isValid: Bool { return !self.rawValue.isEmpty }
 			
 			static let none = ID(rawValue: "", kind: .none)
 			
-			public init(rawValue: String, kind: Kind) {
+			public init(rawValue: String, kind: Kind, isPrepurchased: Bool = false) {
 				self.rawValue = rawValue
 				self.kind = kind
+				self.isPrepurchased = isPrepurchased
 			}
 		}
 		
