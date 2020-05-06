@@ -62,10 +62,10 @@ extension CapitalistManager {
 		}
 		
 		func isOlderThan(receipt: [String: Any]) -> Bool {
-			guard let newString = receipt["purchase_date"] as? String, let newDate = newString.toCapitalistDate() else { return false }
+			guard let receiptPurchaseDate = receipt.purchaseDate else { return false }
 			guard let purchaseDate = self.date(for: "purchase_date") else { return true }
 			
-			return newDate > purchaseDate
+			return receiptPurchaseDate > purchaseDate
 		}
 		
 		var info: [String: Any]?
@@ -201,5 +201,13 @@ extension String {
 		//formatter.dateFormat = "yyyy-MM-dd HH:mm:ss z"
 					
 		return String.capitalistFormatter.date(from: self)
+	}
+}
+
+extension Dictionary where Key == String {
+	var purchaseDate: Date? {
+		guard let newString = self["purchase_date"] as? String, let newDate = newString.toCapitalistDate() else { return nil }
+		
+		return newDate
 	}
 }

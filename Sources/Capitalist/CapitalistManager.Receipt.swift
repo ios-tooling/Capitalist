@@ -28,13 +28,16 @@ extension CapitalistManager {
 	}
 	
 	private func load(receipts: [[String: Any]]) {
+		self.purchasedConsumables = []
 		for receipt in receipts {
 			guard
 				let id = self.productID(from: receipt["product_id"] as? String ?? ""),
 				let product = CapitalistManager.instance.product(for: id)
 			else { continue }
 			
-			if product.isOlderThan(receipt: receipt) {
+			if product.id.kind == .consumable, let purchaseDate = receipt.purchaseDate {
+				self.recordConsumablePurchase(of: product.id, at: purchaseDate)
+			} else if product.isOlderThan(receipt: receipt) {
 				self.availableProducts[id]?.info = receipt
 				if self.availableProducts[id]?.id.kind == .nonConsumable, self.availableProducts[id]?.hasPurchased == true {
 					self.purchasedProducts.append(id)

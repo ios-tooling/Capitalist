@@ -28,6 +28,7 @@ public class CapitalistManager: NSObject {
 	public var useSandbox = !Gestalt.isProductionBuild
 	public var allProductIDs: [Product.ID] = []
 	public var purchaseTimeOut = TimeInterval.minute * 2
+	public var purchasedConsumables: [ConsumablePurchase] = []
 	public weak var delegate: CapitalistManagerDelegate?
 	
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
@@ -132,8 +133,11 @@ public class CapitalistManager: NSObject {
 		return true
 	}
 	
-	func recordPurchase(of product: Product) {
+	func recordPurchase(of product: Product, at date: Date?) {
 		self.purchasedProducts.append(product.id)
+		if product.id.kind == .consumable, let purchasedAt = date {
+			self.recordConsumablePurchase(of: product.id, at: purchasedAt)
+		}
 
 		let completion = self.purchaseCompletion
 		self.purchaseCompletion = nil
@@ -165,12 +169,24 @@ public class CapitalistManager: NSObject {
 }
 
 extension CapitalistManager: SKPaymentTransactionObserver {
+	public func clearOpenTransactions() {
+		let queue = SKPaymentQueue.default()
+		let transactions = queue.transactions
+		if transactions.isEmpty { return }
+		
+		print("There were \(transactions.count) pending transactions waiting to be cleared:")
+		transactions.forEach {
+			print($0.detailedDescription)
+			queue.finishTransaction($0)
+		}
+	}
+	
 	public func paymentQueue(_ queue: SKPaymentQueue, updatedTransactions transactions: [SKPaymentTransaction]) {
 		for transaction in transactions {
 			switch transaction.transactionState {
 			case .purchased, .restored:
 				if let product = self.product(from: self.productID(from: transaction.payment.productIdentifier)) {
-					self.recordPurchase(of: product)
+					self.recordPurchase(of: product, at: transaction.transactionDate)
 					SKPaymentQueue.default().finishTransaction(transaction)
 				}
 				
@@ -269,3 +285,27 @@ extension CapitalistManager: SKProductsRequestDelegate {
 	}
 }
 
+extension SKPaymentTransaction {
+	var detailedDescription: String {
+		var text = "\(self.payment.productIdentifier) - \(self.transactionState.description)"
+		
+		if let date = self.transactionDate {
+			text += " at \(date.localTimeString())"
+		}
+		
+		return text
+	}
+}
+
+extension SKPaymentTransactionState {
+	var description: String {
+		switch self {
+		case .deferred: return "deferred"
+		case .failed: return "failed"
+		case .purchased: return "purchased"
+		case .purchasing: return "purchasing"
+		case .restored: return "restored"
+		default: return "unknown state"
+		}
+	}
+}
