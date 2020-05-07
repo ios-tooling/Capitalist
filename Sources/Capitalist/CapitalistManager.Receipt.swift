@@ -32,9 +32,10 @@ extension CapitalistManager {
 		for receipt in receipts {
 			guard
 				let id = self.productID(from: receipt["product_id"] as? String ?? ""),
-				let product = CapitalistManager.instance.product(for: id)
+				let product = CapitalistManager.instance.product(for: id) ?? CapitalistManager.Product(product: nil, id: id)
 			else { continue }
 			
+			if self.availableProducts[id] == nil { self.availableProducts[id] = product }
 			if product.id.kind == .consumable, let purchaseDate = receipt.purchaseDate {
 				self.recordConsumablePurchase(of: product.id, at: purchaseDate)
 			} else if product.isOlderThan(receipt: receipt) {

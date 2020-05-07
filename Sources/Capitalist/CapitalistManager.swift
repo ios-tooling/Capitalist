@@ -16,6 +16,7 @@ typealias ReceiptCompletion = ([String: Any]?) -> Void
 
 public protocol CapitalistManagerDelegate: class {
 	func didFetchProducts()
+	func didPurchase(product: CapitalistManager.Product)
 }
 
 public class CapitalistManager: NSObject {
@@ -38,9 +39,10 @@ public class CapitalistManager: NSObject {
 	private weak var purchaseTimeOutTimer: Timer?
 
 	public func setup(with secret: String, productIDs: [Product.ID]) {
+		SKPaymentQueue.default().add(self)
 		CapitalistManager.Receipt.appSpecificSharedSecret = secret
 		self.allProductIDs = productIDs
-		SKPaymentQueue.default().add(self)
+		self.receipt.loadLocal(refreshingIfRequired: false)
 		self.requestProducts()
 	}
 	
@@ -79,8 +81,12 @@ public class CapitalistManager: NSObject {
 		return .none
 	}
 	
-	public func restorePurchases() {
-		SKPaymentQueue.default().restoreCompletedTransactions()
+	public func restorePurchases(justUsingReceipt: Bool = true) {
+		if justUsingReceipt, !Gestalt.isAttachedToDebugger {
+			self.receipt.refresh()
+		} else {
+			SKPaymentQueue.default().restoreCompletedTransactions()
+		}
 	}
 	
 	public func product(for id: Product.ID) -> Product? {
@@ -89,7 +95,7 @@ public class CapitalistManager: NSObject {
 
 	public func canPurchase(_ id: Product.ID) -> Bool {
 		if self.state != .idle, self.state != .restoring { return false }
-		guard !id.isPrepurchased, let product = self.product(for: id) else { return false }
+		guard !id.isPrepurchased, let product = self.product(for: id), product.product != nil else { return false }
 		
 		switch product.id.kind {
 		case .consumable: return true
@@ -101,7 +107,7 @@ public class CapitalistManager: NSObject {
 	
 	@discardableResult
 	public func purchase(_ id: Product.ID, completion: ((Product?, Error?) -> Void)? = nil) -> Bool {
-		guard let product = self.product(for: id) else {
+		guard let product = self.product(for: id), let skProduct = product.product else {
 			completion?(nil, CapitalistError.productNotFound)
 			return false
 		}
@@ -119,6 +125,7 @@ public class CapitalistManager: NSObject {
 			if product.id.kind == .nonConsumable, self.hasPurchased(product.id) {
 				self.purchaseCompletion?(product, nil)
 				Notifications.didPurchaseProduct.notify()
+				self.delegate?.didPurchase(product: product)
 				return
 			}
 					
@@ -126,7 +133,7 @@ public class CapitalistManager: NSObject {
 				self.failPurchase(of: product, dueTo: CapitalistError.requestTimedOut)
 			}
 
-			let payment = SKPayment(product: product.product)
+			let payment = SKPayment(product: skProduct)
 			SKPaymentQueue.default().add(payment)
 		}
 		
@@ -149,11 +156,13 @@ public class CapitalistManager: NSObject {
 					completion?(product, nil)
 					self.state = .idle
 					Notifications.didPurchaseProduct.notify()
+					self.delegate?.didPurchase(product: product)
 				}
 			} else {
 				completion?(product, nil)
 				self.state = .idle
 				Notifications.didPurchaseProduct.notify()
+				self.delegate?.didPurchase(product: product)
 			}
 		}
 	}

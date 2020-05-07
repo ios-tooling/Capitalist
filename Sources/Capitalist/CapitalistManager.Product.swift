@@ -33,8 +33,8 @@ extension CapitalistManager {
 			}
 		}
 		
-		public init?(product: SKProduct, info: [String: Any]? = nil) {
-			guard let id = CapitalistManager.instance.productID(from: product.productIdentifier) else {
+		public init?(product: SKProduct?, id localID: ID? = nil, info: [String: Any]? = nil) {
+			guard let id = localID ?? CapitalistManager.instance.productID(from: product?.productIdentifier) else {
 				self.id = .none
 				return nil
 			}
@@ -47,7 +47,7 @@ extension CapitalistManager {
 			var text = self.id.rawValue + " - " + self.id.kind.rawValue
 			if let reason = self.expirationReason { text += ", Expired: \(reason)" }
 			if #available(iOS 11.2, OSX 10.13.2, *) {
-				if !self.hasUsedTrial, self.product.introductoryPrice != nil { text += " can trial" }
+				if !self.hasUsedTrial, self.product?.introductoryPrice != nil { text += " can trial" }
 			}
 			if self.isInTrialPeriod { text += " in trial" }
 			if self.isInIntroOfferPeriod { text += " in intro period" }
@@ -70,15 +70,15 @@ extension CapitalistManager {
 		
 		var info: [String: Any]?
 		let id: CapitalistManager.Product.ID
-		let product: SKProduct
+		var product: SKProduct?
 		
 		public var expirationReason: ExpirationReason? {
 			guard let reason = self.info?["expiration_intent"] as? Int else { return nil }
 			return ExpirationReason(rawValue: reason)
 		}
 		
-		public var rawPrice: Double { return self.product.price.doubleValue }
-		public var price: NSDecimalNumber { return self.product.price }
+		public var rawPrice: Double? { return self.product?.price.doubleValue }
+		public var price: NSDecimalNumber? { return self.product?.price }
 		public var isInBillingRetryPeriod: Bool { return Bool(any: self.info?["is_in_billing_retry_period"]) }
 		public var isInIntroOfferPeriod: Bool { return Bool(any: self.info?["is_in_intro_offer_period"]) }
 		public var isInTrialPeriod: Bool { return Bool(any: self.info?["is_trial_period"]) }
