@@ -318,3 +318,11 @@ extension SKPaymentTransactionState {
 		}
 	}
 }
+
+extension Error {
+	public var isStoreKitCancellation: Bool {
+		let err: Error? = self
+		
+		return (err as NSError?)?.code == 2 && (err as NSError?)?.domain == SKErrorDomain
+	}
+}

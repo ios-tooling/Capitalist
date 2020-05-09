@@ -1,5 +1,5 @@
 //
-//  File.swift
+//  CapitalistManagerEnums.swift
 //  
 //
 //  Created by ben on 5/5/20.
