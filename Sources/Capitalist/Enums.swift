@@ -8,6 +8,21 @@
 import Foundation
 
 extension CapitalistManager {
+	public struct PurchaseFlag : OptionSet, Equatable {
+		public static func ==(lhs: PurchaseFlag, rhs: PurchaseFlag) -> Bool {
+			return lhs.rawValue == rhs.rawValue
+		}
+
+		public var rawValue: UInt
+		
+		public init(rawValue: UInt) {
+			self.rawValue = rawValue
+		}
+		
+		public static let prepurchased = PurchaseFlag(rawValue: 1 << 0)
+		public static let restored = PurchaseFlag(rawValue: 1 << 1)
+	}
+	
 	public enum CapitalistError: String, Error, LocalizedError, CustomStringConvertible {
 		case productNotFound, purchaseAlreadyInProgress, requestTimedOut
 		public var localizedDescription: String { return self.rawValue }
@@ -25,5 +40,15 @@ extension CapitalistManager {
 			default: return false
 			}
 		}
+	}
+}
+
+extension Notification {
+	public static let purchaseFlagsKey = "Capitalist:PurchaseFlags"
+	public var purchaseFlags: CapitalistManager.PurchaseFlag {
+		return self.userInfo?[Notification.purchaseFlagsKey] as? CapitalistManager.PurchaseFlag ?? []
+	}
+	public static func purchaseFlagsDict(_ flags: CapitalistManager.PurchaseFlag) -> [String: Any] {
+		return [Notification.purchaseFlagsKey: flags]
 	}
 }

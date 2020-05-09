@@ -16,7 +16,7 @@ typealias ReceiptCompletion = ([String: Any]?) -> Void
 
 public protocol CapitalistManagerDelegate: class {
 	func didFetchProducts()
-	func didPurchase(product: CapitalistManager.Product)
+	func didPurchase(product: CapitalistManager.Product, flags: CapitalistManager.PurchaseFlag)
 }
 
 public class CapitalistManager: NSObject {
@@ -124,8 +124,8 @@ public class CapitalistManager: NSObject {
 		self.purchaseQueue.async {
 			if product.id.kind == .nonConsumable, self.hasPurchased(product.id) {
 				self.purchaseCompletion?(product, nil)
-				Notifications.didPurchaseProduct.notify()
-				self.delegate?.didPurchase(product: product)
+				Notifications.didPurchaseProduct.notify(product, info: Notification.purchaseFlagsDict(.prepurchased))
+				self.delegate?.didPurchase(product: product, flags: .prepurchased)
 				return
 			}
 					
@@ -140,7 +140,7 @@ public class CapitalistManager: NSObject {
 		return true
 	}
 	
-	func recordPurchase(of product: Product, at date: Date?) {
+	func recordPurchase(of product: Product, at date: Date?, restored: Bool) {
 		self.purchasedProducts.append(product.id)
 		if product.id.kind == .consumable, let purchasedAt = date {
 			self.recordConsumablePurchase(of: product.id, at: purchasedAt)
@@ -155,14 +155,14 @@ public class CapitalistManager: NSObject {
 				self.receipt.refresh() { error in
 					completion?(product, nil)
 					self.state = .idle
-					Notifications.didPurchaseProduct.notify()
-					self.delegate?.didPurchase(product: product)
+					Notifications.didPurchaseProduct.notify(product, info: Notification.purchaseFlagsDict(restored ? .restored : []))
+					self.delegate?.didPurchase(product: product, flags: restored ? .restored : [])
 				}
 			} else {
 				completion?(product, nil)
 				self.state = .idle
-				Notifications.didPurchaseProduct.notify()
-				self.delegate?.didPurchase(product: product)
+				Notifications.didPurchaseProduct.notify(product, info: Notification.purchaseFlagsDict(restored ? .restored : []))
+				self.delegate?.didPurchase(product: product, flags: restored ? .restored : [])
 			}
 		}
 	}
@@ -195,7 +195,7 @@ extension CapitalistManager: SKPaymentTransactionObserver {
 			switch transaction.transactionState {
 			case .purchased, .restored:
 				if let product = self.product(from: self.productID(from: transaction.payment.productIdentifier)) {
-					self.recordPurchase(of: product, at: transaction.transactionDate)
+					self.recordPurchase(of: product, at: transaction.transactionDate, restored: transaction.transactionState == .restored)
 					SKPaymentQueue.default().finishTransaction(transaction)
 				}
 				
