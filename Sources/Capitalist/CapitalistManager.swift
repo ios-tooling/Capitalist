@@ -31,6 +31,7 @@ public class CapitalistManager: NSObject {
 	public var purchaseTimeOut = TimeInterval.minute * 2
 	public var purchasedConsumables: [ConsumablePurchase] = []
 	public weak var delegate: CapitalistManagerDelegate?
+	public var subscriptionManagementURL = URL(string: "https://finance-app.itunes.apple.com/account/subscriptions")!
 	
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
 
