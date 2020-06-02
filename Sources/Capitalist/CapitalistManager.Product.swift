@@ -71,6 +71,11 @@ extension CapitalistManager {
 		var info: [String: Any]?
 		let id: CapitalistManager.Product.ID
 		var product: SKProduct?
+		static let currencyFormatter: NumberFormatter = {
+			let formatter = NumberFormatter()
+			formatter.numberStyle = .currency
+			return formatter
+		}()
 		
 		public var expirationReason: ExpirationReason? {
 			guard let reason = self.info?["expiration_intent"] as? Int else { return nil }
@@ -79,6 +84,11 @@ extension CapitalistManager {
 		
 		public var rawPrice: Double? { return self.product?.price.doubleValue }
 		public var price: NSDecimalNumber? { return self.product?.price }
+		public var localizedPrice: String? {
+			guard let product = self.product else { return nil }
+			Self.currencyFormatter.locale = product.priceLocale
+			return Self.currencyFormatter.string(from: product.price)
+		}
 		public var isInBillingRetryPeriod: Bool { return Bool(any: self.info?["is_in_billing_retry_period"]) }
 		public var isInIntroOfferPeriod: Bool { return Bool(any: self.info?["is_in_intro_offer_period"]) }
 		public var isInTrialPeriod: Bool { return Bool(any: self.info?["is_trial_period"]) }
