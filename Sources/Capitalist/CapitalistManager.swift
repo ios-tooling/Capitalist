@@ -45,6 +45,7 @@ public class CapitalistManager: NSObject {
 		self.allProductIDs = productIDs
 		self.receipt.loadLocal(refreshingIfRequired: false)
 		self.requestProducts()
+		self.checkForPurchases()
 	}
 	
 	public func checkForPurchases() {

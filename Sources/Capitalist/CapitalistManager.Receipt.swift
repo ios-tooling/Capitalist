@@ -52,15 +52,7 @@ extension CapitalistManager {
 		public var isRefreshing = false
 		public var cachedReciept: [String: Any]?
 		var currentCheckingHash: Int?
-		
-		public override init() {
-			super.init()
-			
-			DispatchQueue.main.async {
-				self.loadLocal(refreshingIfRequired: false)
-			}
-		}
-				
+
 		var refreshCompletions: [(Error?) -> Void] = []
 		
 		public func refresh(completion: ((Error?) -> Void)? = nil) {
