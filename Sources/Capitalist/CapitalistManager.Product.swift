@@ -43,6 +43,11 @@ extension CapitalistManager {
 			self.product = product
 		}
 		
+		public var introductoryPrice: String? {
+			guard let price = product?.introductoryPrice else { return nil }
+			return String(format: "$%.02f", price)
+		}
+		
 		public var description: String {
 			var text = self.id.rawValue + " - " + self.id.kind.rawValue
 			if let reason = self.expirationReason { text += ", Expired: \(reason)" }
