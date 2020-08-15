@@ -18,7 +18,7 @@ let package = Package(
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
-		  .package(url: "https://github.com/bengottlieb/Suite.git", from: "0.9.30"),
+		  .package(url: "https://github.com/bengottlieb/Suite.git", from: "0.9.59"),
 		  .package(url: "https://github.com/bengottlieb/CrossPlatformKit", from: "1.0.1"),
     ],
     targets: [

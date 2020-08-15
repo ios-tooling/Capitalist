@@ -45,7 +45,7 @@ extension CapitalistManager {
 		
 		public var introductoryPrice: String? {
 			if #available(iOS 11.2, OSX 10.13.2, *) {
-				guard let price = product?.introductoryPrice else { return nil }
+				guard let price = product?.introductoryPrice?.price as? Double else { return nil }
 				return String(format: "$%.02f", price)
 			} else {
 				return nil
