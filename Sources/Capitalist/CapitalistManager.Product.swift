@@ -52,6 +52,34 @@ extension CapitalistManager {
 			}
 		}
 		
+		@available(OSX 10.13.2, iOS 11.2, *)
+		public var freeTrialDays: Int? {
+			guard let intro = self.product?.introductoryPrice, intro.paymentMode == .freeTrial else { return nil }
+			
+			let count = intro.subscriptionPeriod.numberOfUnits
+			switch intro.subscriptionPeriod.unit {
+			case .day: return count
+			case .week: return count * 7
+			case .month: return count * 30
+			case .year: return count * 365
+			default: return nil
+			}
+		}
+
+		@available(OSX 10.13.2, iOS 11.2, *)
+		public var freeTrialDurationDescription: String? {
+			guard let intro = self.product?.introductoryPrice, intro.paymentMode == .freeTrial else { return nil }
+			
+			let count = intro.subscriptionPeriod.numberOfUnits
+			switch intro.subscriptionPeriod.unit {
+			case .day: return count == 1 ? NSLocalizedString("1 day", comment: "1 day trial") : String(format: NSLocalizedString("%d days", comment: "Trial duration in days"), count)
+			case .week: return count == 1 ? NSLocalizedString("1 day", comment: "1 day trial") :  String(format: NSLocalizedString("%d weeks", comment: "Trial duration in weeks"), count)
+			case .month: return count == 1 ? NSLocalizedString("1 day", comment: "1 day trial") :  String(format: NSLocalizedString("%d months", comment: "Trial duration in months"), count)
+			case .year: return count == 1 ? NSLocalizedString("1 day", comment: "1 day trial") :  String(format: NSLocalizedString("%d years", comment: "Trial duration in years"), count)
+			default: return nil
+			}
+		}
+
 		public var description: String {
 			var text = self.id.rawValue + " - " + self.id.kind.rawValue
 			if let reason = self.expirationReason { text += ", Expired: \(reason)" }
