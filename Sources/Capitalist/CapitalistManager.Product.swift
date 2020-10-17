@@ -106,7 +106,7 @@ extension CapitalistManager {
 		}
 		
 		var info: [String: Any]?
-		let id: CapitalistManager.Product.ID
+		public let id: CapitalistManager.Product.ID
 		var product: SKProduct?
 		static let currencyFormatter: NumberFormatter = {
 			let formatter = NumberFormatter()
