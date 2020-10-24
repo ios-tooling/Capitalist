@@ -111,6 +111,9 @@ public class CapitalistManager: NSObject {
 	public func purchase(_ id: Product.ID, completion: ((Product?, Error?) -> Void)? = nil) -> Bool {
 		guard let product = self.product(for: id), let skProduct = product.product else {
 			completion?(nil, CapitalistError.productNotFound)
+
+			Notifications.didFailToPurchaseProduct.notify(id, info: ["error": CapitalistError.productNotFound])
+
 			return false
 		}
 
@@ -254,12 +257,15 @@ extension CapitalistManager: SKRequestDelegate {
 			print("We shouldn't hit an error when we're idle.")
 			
 		case .fetchingProducts:
+			print("Failed to fetch products: \(error)")
 			self.purchaseQueue.resume()
 			
 		case .purchasing(let product):
+			print("Failed to purchase \(product): \(error)")
 			self.failPurchase(of: product, dueTo: error)
 			
-		case .restoring: break
+		case .restoring:
+			print("Restore failed: \(error)")
 		}
 		
 		self.state = .idle
