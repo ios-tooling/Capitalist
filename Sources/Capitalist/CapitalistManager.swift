@@ -39,13 +39,13 @@ public class CapitalistManager: NSObject {
 	private var purchaseCompletion: ((Product?, Error?) -> Void)?
 	private weak var purchaseTimeOutTimer: Timer?
 
-	public func setup(with secret: String, productIDs: [Product.ID]) {
+	public func setup(with secret: String, productIDs: [Product.ID], refreshReceipt: Bool = true) {
 		SKPaymentQueue.default().add(self)
 		CapitalistManager.Receipt.appSpecificSharedSecret = secret
 		self.allProductIDs = productIDs
 		self.receipt.loadLocal(refreshingIfRequired: false)
 		self.requestProducts()
-		self.checkForPurchases()
+		if refreshReceipt { self.checkForPurchases() }
 	}
 	
 	public func checkForPurchases() {

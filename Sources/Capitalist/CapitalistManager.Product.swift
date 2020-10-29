@@ -132,6 +132,7 @@ extension CapitalistManager {
 		public var subscriptionCancellationDate: Date? { return self.date(for: "cancellation_date") }
 		public var subscriptionExpirationDate: Date? { return self.date(for: "expires_date") }
 		public var originalPurchaseDate: Date? { return self.date(for: "original_purchase_date") }
+		public var purchaseDate: Date? { return self.date(for: "purchase_date") }
 		public var hasUsedTrial: Bool { return self.isInTrialPeriod || self.isInIntroOfferPeriod || self.originalPurchaseDate != nil }
 		public var isSubscriptionActive: Bool {
 			guard let expirationDate = self.subscriptionExpirationDate else { return false }
