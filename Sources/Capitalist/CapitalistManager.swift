@@ -26,6 +26,7 @@ public class CapitalistManager: NSObject {
 	public var availableProducts: [Product.ID: Product] = [:]
 	public var waitingPurchases: [Product.ID] = []
 	public var receipt = Receipt()
+	public var cacheDecryptedReceipts = true
 	public var useSandbox = !Gestalt.isProductionBuild
 	public var allProductIDs: [Product.ID] = []
 	public var purchaseTimeOut = TimeInterval.minute * 2
@@ -131,6 +132,7 @@ public class CapitalistManager: NSObject {
 				self.purchaseCompletion?(product, nil)
 				Notifications.didPurchaseProduct.notify(product, info: Notification.purchaseFlagsDict(.prepurchased))
 				self.delegate?.didPurchase(product: product, flags: .prepurchased)
+				self.state = .idle
 				return
 			}
 					
@@ -154,7 +156,7 @@ public class CapitalistManager: NSObject {
 		let completion = self.purchaseCompletion
 		self.purchaseCompletion = nil
 
-		self.receipt.loadLocal() { error in
+		self.receipt.loadLocal(refreshingIfRequired: true) { error in
 			if let err = error { print("Error when loading local receipt: \(err)") }
 			if product.id.kind == .subscription {
 				self.receipt.refresh() { error in
@@ -295,7 +297,7 @@ extension CapitalistManager: SKProductsRequestDelegate {
 		
 		self.state = .idle
 		
-		self.receipt.updateCachedReciept()
+		self.receipt.updateCachedReceipt()
 		self.purchaseQueue.resume()
 		Notifications.didFetchProducts.notify()
 		self.delegate?.didFetchProducts()

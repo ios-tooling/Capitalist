@@ -6,6 +6,8 @@ import Foundation
 import StoreKit
 import Studio
 
+public typealias CapitalistErrorCallback = (Error?) -> Void
+
 extension CapitalistManager {	
 	public func currentExpirationDate(for productIDs: [Product.ID] = CapitalistManager.instance.allProductIDs) -> Date? {
 		var newest: Date?
@@ -55,7 +57,7 @@ extension CapitalistManager {
 
 		var refreshCompletions: [(Error?) -> Void] = []
 		
-		public func refresh(completion: ((Error?) -> Void)? = nil) {
+		public func refresh(completion: CapitalistErrorCallback? = nil) {
 			if let comp = completion { self.refreshCompletions.append(comp) }
 			
 			if self.isRefreshing { return }
@@ -66,27 +68,55 @@ extension CapitalistManager {
 			op.start()
 		}
 		
-		func updateCachedReciept() {
+		func updateCachedReceipt(receipt: [String: Any]? = nil) {
+			if receipt != nil { cachedReciept = receipt }
 			if let recp = self.cachedReciept?["receipt"] as? [String: Any], let inApp = recp["in_app"] as? [[String: Any]] { CapitalistManager.instance.load(receipts: inApp) }
 			if let info = self.cachedReciept?["latest_receipt_info"] as? [[String: Any]] { CapitalistManager.instance.load(receipts: info) }
 		}
 		
-		func loadLocal(refreshingIfRequired: Bool = true, completion: ((Error?) -> Void)? = nil) {
+		@discardableResult
+		func loadBundleReceipt(completion: CapitalistErrorCallback? = nil) -> Bool {
 			if let url = Bundle.main.appStoreReceiptURL, let receipt = try? Data(contentsOf: url) {
 				self.isRefreshing = true
 				self.validate(data: receipt) { receipt in
-					self.cachedReciept = receipt
 					self.isRefreshing = false
-					self.updateCachedReciept()
+					self.updateCachedReceipt(receipt: receipt)
 					DispatchQueue.main.async {
 						Notifications.didRefreshReceipt.notify()
 						completion?(nil)
 					}
 				}
-			} else if refreshingIfRequired {
-				self.refresh(completion: completion)
-			} else {
-				completion?(nil)
+				return true
+			}
+			return false
+		}
+		
+		func loadLocal(refreshingIfRequired: Bool, completion: CapitalistErrorCallback? = nil) {
+			if !refreshingIfRequired {
+				do {
+					if let receipt = cachedReciept {
+						self.updateCachedReceipt(receipt: receipt)
+						self.callValidationCompletions(with: receipt)
+						completion?(nil)
+						return
+					} else if self.cachedReciept == nil, let data = lastValidReceiptData, let receipt = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+						self.updateCachedReceipt(receipt: receipt)
+						self.callValidationCompletions(with: receipt)
+						completion?(nil)
+						return
+					}
+				} catch {
+					print("Problem decoding last receipt: \(error)")
+					lastValidReceiptData = nil
+				}
+			}
+			
+			if !loadBundleReceipt(completion: completion) {
+				if refreshingIfRequired {
+					self.refresh(completion: completion)
+				} else {
+					completion?(nil)
+				}
 			}
 		}
 		
@@ -117,17 +147,15 @@ extension CapitalistManager {
 						self.validate(data: receiptData, completion: completion)
 						return
 					} else if status == 21004 {
-						print("Your secret (\(Receipt.appSpecificSharedSecret ?? "<missing>")) doesn't seem to be correct.")
-						self.callValidationCompletions(with: nil)
+						print("Your secret \(Receipt.appSpecificSharedSecret == nil ? "is missing." : "doesn't seem to be correct.")")
 					} else if status != 0 {
 						print("Bad status (\(status)) returned from the AppStore.")
-						self.callValidationCompletions(with: nil)
 					} else {
-						self.callValidationCompletions(with: info)
+						self.lastValidReceiptData = data
 					}
-				} else {
 					self.callValidationCompletions(with: nil)
 				}
+				DispatchQueue.main.async { self.callValidationCompletions(with: nil) }
 			}
 			
 			task.resume()
@@ -137,10 +165,22 @@ extension CapitalistManager {
 			let completions = self.validationCompletions
 			self.currentCheckingHash = nil
 			self.validationCompletions = []
-			
-			DispatchQueue.main.async {
-				completions.forEach { $0(results) }
+			completions.forEach { $0(results) }
+		}
+		
+		var lastValidReceiptDataURL: URL {
+			URL(fileURLWithPath: NSSearchPathForDirectoriesInDomains(.libraryDirectory, [.userDomainMask], true).first!).appendingPathComponent("cached_receipt.dat")
+		}
+		
+		var lastValidReceiptData: Data? {
+			set {
+				if !CapitalistManager.instance.cacheDecryptedReceipts || newValue == nil {
+					try? FileManager.default.removeItem(at: lastValidReceiptDataURL)
+				} else {
+					try? newValue?.write(to: lastValidReceiptDataURL)
+				}
 			}
+			get { try? Data(contentsOf: lastValidReceiptDataURL) }
 		}
 	}
 }
@@ -148,9 +188,7 @@ extension CapitalistManager {
 extension CapitalistManager.Receipt: SKRequestDelegate {
 	public func requestDidFinish(_ request: SKRequest) {
 		self.isRefreshing = false
-		self.loadLocal(refreshingIfRequired: false) { _ in
-			self.callRefreshCompletions(with: nil)
-		}
+		if request is SKReceiptRefreshRequest { loadBundleReceipt() }
 	}
 	
 	public func request(_ request: SKRequest, didFailWithError error: Error) {
