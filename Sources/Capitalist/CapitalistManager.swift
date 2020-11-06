@@ -6,11 +6,7 @@ import Foundation
 import StoreKit
 import Studio
 
-/*
-
-	Call CapitalistManager.instance.setup(with: Secret, productIDs: [Product IDs]) in AppDelegate.didFinishLaunching
-	
-*/
+/// Call CapitalistManager.instance.setup(with: Secret, productIDs: [Product IDs]) in AppDelegate.didFinishLaunching
 
 public protocol CapitalistManagerDelegate: class {
 	func didFetchProducts()
@@ -30,6 +26,7 @@ public class CapitalistManager: NSObject {
 	public var purchaseTimeOut = TimeInterval.minute * 2
 	public var purchasedConsumables: [ConsumablePurchase] = []
 	public weak var delegate: CapitalistManagerDelegate?
+	public var loggingOn = true
 	public var subscriptionManagementURL = URL(string: "https://finance-app.itunes.apple.com/account/subscriptions")!
 	
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
@@ -146,7 +143,7 @@ public class CapitalistManager: NSObject {
 	}
 	
 	func recordPurchase(of product: Product, at date: Date?, restored: Bool) {
-		self.purchasedProducts.append(product.id)
+		if !purchasedProducts.contains(product.id) || product.id.kind == .consumable { self.purchasedProducts.append(product.id) }
 		if product.id.kind == .consumable, let purchasedAt = date {
 			self.recordConsumablePurchase(of: product.id, at: purchasedAt)
 		}
@@ -286,10 +283,27 @@ extension CapitalistManager: SKProductsRequestDelegate {
 		
 		self.state = .idle
 		
-		self.receipt.updateCachedReceipt()
+		self.receipt.updateCachedReceipt(label: "Product Request Completed")
 		self.purchaseQueue.resume()
 		Notifications.didFetchProducts.notify()
 		self.delegate?.didFetchProducts()
+	}
+	
+	public func logCurrentProducts(label: String) {
+		var text = label + "\n"
+		
+		for id in purchasedProducts {
+			guard let product = self.product(for: id) else { continue }
+			
+			switch id.kind {
+			case .subscription: text += "\(product) valid until: \(product.expirationDateString)\n"
+			case .consumable: text += "\(product)\n"
+			case .nonConsumable: text += "\(product)\n"
+			case .none: text += "Bad product: \(product)\n"
+			}
+		}
+		
+		print("-------------------------------\n" + text + "-------------------------------")
 	}
 }
 

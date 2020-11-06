@@ -138,6 +138,10 @@ extension CapitalistManager {
 			guard let expirationDate = self.subscriptionExpirationDate else { return false }
 			return expirationDate > Date()
 		}
+		public var expirationDateString: String {
+			guard let date = subscriptionExpirationDate else { return "--" }
+			return DateFormatter.pretty.string(from: date)
+		}
 		
 		public var quantity: Int { return Int(any: self.info?["quantity"] ?? "") }
 		public var hasPurchased: Bool {
@@ -213,11 +217,7 @@ extension CapitalistManager {
 			}
 			
 			func string(from date: Date) -> String {
-				let prettyFormatter = DateFormatter()
-				prettyFormatter.dateStyle = .short
-				prettyFormatter.timeStyle = .short
-				
-				return prettyFormatter.string(from: date)
+				DateFormatter.pretty.string(from: date)
 			}
 		}
 
@@ -234,6 +234,16 @@ extension CapitalistManager {
 			}
 		}
 	}
+}
+
+extension DateFormatter {
+	static let pretty: DateFormatter = {
+		let prettyFormatter = DateFormatter()
+		prettyFormatter.dateStyle = .short
+		prettyFormatter.timeStyle = .short
+
+		return prettyFormatter
+	}()
 }
 
 

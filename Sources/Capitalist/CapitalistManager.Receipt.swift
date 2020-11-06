@@ -43,7 +43,7 @@ extension CapitalistManager {
 				self.recordConsumablePurchase(of: product.id, at: purchaseDate)
 			} else if product.isOlderThan(receipt: receipt) {
 				self.availableProducts[id]?.info = receipt
-				if self.availableProducts[id]?.id.kind == .nonConsumable, self.availableProducts[id]?.hasPurchased == true {
+				if self.availableProducts[id]?.id.kind != .consumable, self.availableProducts[id]?.hasPurchased == true, !self.purchasedProducts.contains(id) {
 					self.purchasedProducts.append(id)
 				}
 			}
@@ -53,6 +53,7 @@ extension CapitalistManager {
 	public class Receipt: NSObject {
 		public static var appSpecificSharedSecret: String!			//this should be found in AppStoreConnect
 		public var isRefreshing = false
+		public var isValidating = false
 		public var cachedReciept: [String: Any]?
 		var currentCheckingHash: Int?
 
@@ -61,10 +62,8 @@ extension CapitalistManager {
 		override init() {
 			super.init()
 			do {
-				if let receipt = cachedReciept {
-					self.updateCachedReceipt(receipt: receipt)
-				} else if self.cachedReciept == nil, let data = lastValidReceiptData, let receipt = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
-					self.updateCachedReceipt(receipt: receipt)
+				if let data = lastValidReceiptData, let receipt = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+					self.updateCachedReceipt(label: "Setup", receipt: receipt)
 				}
 			} catch {
 				print("Problem decoding last receipt: \(error)")
@@ -77,6 +76,7 @@ extension CapitalistManager {
 			if let comp = completion { self.refreshCompletions.append(comp) }
 			
 			if self.isRefreshing { return }
+			if CapitalistManager.instance.loggingOn { print("Refreshing Receipt") }
 			let op = SKReceiptRefreshRequest(receiptProperties: nil)
 			self.isRefreshing = true
 
@@ -84,18 +84,20 @@ extension CapitalistManager {
 			op.start()
 		}
 		
-		func updateCachedReceipt(receipt: [String: Any]? = nil) {
+		func updateCachedReceipt(label: String, receipt: [String: Any]? = nil) {
 			if receipt != nil { cachedReciept = receipt }
 			if let recp = self.cachedReciept?["receipt"] as? [String: Any], let inApp = recp["in_app"] as? [[String: Any]] { CapitalistManager.instance.load(receipts: inApp) }
 			if let info = self.cachedReciept?["latest_receipt_info"] as? [[String: Any]] { CapitalistManager.instance.load(receipts: info) }
+			
+			if CapitalistManager.instance.loggingOn { CapitalistManager.instance.logCurrentProducts(label: label) }
 		}
 		
 		@discardableResult
 		func loadBundleReceipt(completion: CapitalistErrorCallback? = nil) -> Bool {
 			if let url = Bundle.main.appStoreReceiptURL, let receipt = try? Data(contentsOf: url) {
-				self.isRefreshing = true
+				self.isValidating = true
 				self.validate(data: receipt) {
-					self.isRefreshing = false
+					self.isValidating = false
 					DispatchQueue.main.async {
 						Notifications.didRefreshReceipt.notify()
 						completion?(nil)
@@ -103,6 +105,7 @@ extension CapitalistManager {
 				}
 				return true
 			}
+			if CapitalistManager.instance.loggingOn { print("No local receipt found") }
 			return false
 		}
 
@@ -138,7 +141,7 @@ extension CapitalistManager {
 						print("Bad status (\(status)) returned from the AppStore.")
 					} else {
 						self.lastValidReceiptData = data
-						self.updateCachedReceipt(receipt: info)
+						self.updateCachedReceipt(label: "Post Validation", receipt: info)
 					}
 				}
 				DispatchQueue.main.async { self.callValidationCompletions() }
@@ -174,7 +177,10 @@ extension CapitalistManager {
 extension CapitalistManager.Receipt: SKRequestDelegate {
 	public func requestDidFinish(_ request: SKRequest) {
 		self.isRefreshing = false
-		if request is SKReceiptRefreshRequest { loadBundleReceipt() }
+		if request is SKReceiptRefreshRequest {
+			if CapitalistManager.instance.loggingOn { print("Refresh Receipt Completed") }
+			loadBundleReceipt()
+		}
 	}
 	
 	public func request(_ request: SKRequest, didFailWithError error: Error) {
