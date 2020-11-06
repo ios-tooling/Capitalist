@@ -6,6 +6,7 @@ import Foundation
 import StoreKit
 import Studio
 
+public typealias CapitalistCallback = () -> Void
 public typealias CapitalistErrorCallback = (Error?) -> Void
 
 extension CapitalistManager {	
@@ -57,6 +58,21 @@ extension CapitalistManager {
 
 		var refreshCompletions: [(Error?) -> Void] = []
 		
+		override init() {
+			super.init()
+			do {
+				if let receipt = cachedReciept {
+					self.updateCachedReceipt(receipt: receipt)
+				} else if self.cachedReciept == nil, let data = lastValidReceiptData, let receipt = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+					self.updateCachedReceipt(receipt: receipt)
+				}
+			} catch {
+				print("Problem decoding last receipt: \(error)")
+				lastValidReceiptData = nil
+			}
+			loadBundleReceipt()
+		}
+		
 		public func refresh(completion: CapitalistErrorCallback? = nil) {
 			if let comp = completion { self.refreshCompletions.append(comp) }
 			
@@ -78,9 +94,8 @@ extension CapitalistManager {
 		func loadBundleReceipt(completion: CapitalistErrorCallback? = nil) -> Bool {
 			if let url = Bundle.main.appStoreReceiptURL, let receipt = try? Data(contentsOf: url) {
 				self.isRefreshing = true
-				self.validate(data: receipt) { receipt in
+				self.validate(data: receipt) {
 					self.isRefreshing = false
-					self.updateCachedReceipt(receipt: receipt)
 					DispatchQueue.main.async {
 						Notifications.didRefreshReceipt.notify()
 						completion?(nil)
@@ -90,44 +105,15 @@ extension CapitalistManager {
 			}
 			return false
 		}
+
+		var validationCompletions: [CapitalistCallback] = []
 		
-		func loadLocal(refreshingIfRequired: Bool, completion: CapitalistErrorCallback? = nil) {
-			if !refreshingIfRequired {
-				do {
-					if let receipt = cachedReciept {
-						self.updateCachedReceipt(receipt: receipt)
-						self.callValidationCompletions(with: receipt)
-						completion?(nil)
-						return
-					} else if self.cachedReciept == nil, let data = lastValidReceiptData, let receipt = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
-						self.updateCachedReceipt(receipt: receipt)
-						self.callValidationCompletions(with: receipt)
-						completion?(nil)
-						return
-					}
-				} catch {
-					print("Problem decoding last receipt: \(error)")
-					lastValidReceiptData = nil
-				}
-			}
-			
-			if !loadBundleReceipt(completion: completion) {
-				if refreshingIfRequired {
-					self.refresh(completion: completion)
-				} else {
-					completion?(nil)
-				}
-			}
-		}
-		
-		var validationCompletions: [ReceiptCompletion] = []
-		
-		func validate(data receiptData: Data, completion: @escaping ReceiptCompletion) {
+		func validate(data receiptData: Data, completion: @escaping CapitalistCallback) {
 			self.validationCompletions.append(completion)
 
 			let hash = receiptData.hashValue
 			if self.currentCheckingHash == hash {
-				self.callValidationCompletions(with: self.cachedReciept)
+				self.callValidationCompletions()
 				return
 			}
 			
@@ -152,20 +138,20 @@ extension CapitalistManager {
 						print("Bad status (\(status)) returned from the AppStore.")
 					} else {
 						self.lastValidReceiptData = data
+						self.updateCachedReceipt(receipt: info)
 					}
-					self.callValidationCompletions(with: nil)
 				}
-				DispatchQueue.main.async { self.callValidationCompletions(with: nil) }
+				DispatchQueue.main.async { self.callValidationCompletions() }
 			}
 			
 			task.resume()
 		}
 		
-		func callValidationCompletions(with results: [String: Any]?) {
+		func callValidationCompletions() {
 			let completions = self.validationCompletions
 			self.currentCheckingHash = nil
 			self.validationCompletions = []
-			completions.forEach { $0(results) }
+			completions.forEach { $0() }
 		}
 		
 		var lastValidReceiptDataURL: URL {

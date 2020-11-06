@@ -12,8 +12,6 @@ import Studio
 	
 */
 
-typealias ReceiptCompletion = ([String: Any]?) -> Void
-
 public protocol CapitalistManagerDelegate: class {
 	func didFetchProducts()
 	func didPurchase(product: CapitalistManager.Product, flags: CapitalistManager.PurchaseFlag)
@@ -25,7 +23,7 @@ public class CapitalistManager: NSObject {
 	public var purchasedProducts: [Product.ID] = []
 	public var availableProducts: [Product.ID: Product] = [:]
 	public var waitingPurchases: [Product.ID] = []
-	public var receipt = Receipt()
+	public var receipt: Receipt!
 	public var cacheDecryptedReceipts = true
 	public var useSandbox = !Gestalt.isProductionBuild
 	public var allProductIDs: [Product.ID] = []
@@ -44,7 +42,7 @@ public class CapitalistManager: NSObject {
 		SKPaymentQueue.default().add(self)
 		CapitalistManager.Receipt.appSpecificSharedSecret = secret
 		self.allProductIDs = productIDs
-		self.receipt.loadLocal(refreshingIfRequired: false)
+		self.receipt = Receipt()
 		self.requestProducts()
 		if refreshReceipt { self.checkForPurchases() }
 	}
@@ -156,21 +154,12 @@ public class CapitalistManager: NSObject {
 		let completion = self.purchaseCompletion
 		self.purchaseCompletion = nil
 
-		self.receipt.loadLocal(refreshingIfRequired: true) { error in
+		self.receipt.loadBundleReceipt { error in
 			if let err = error { print("Error when loading local receipt: \(err)") }
-			if product.id.kind == .subscription {
-				self.receipt.refresh() { error in
-					completion?(product, nil)
-					self.state = .idle
-					Notifications.didPurchaseProduct.notify(product, info: Notification.purchaseFlagsDict(restored ? .restored : []))
-					self.delegate?.didPurchase(product: product, flags: restored ? .restored : [])
-				}
-			} else {
-				completion?(product, nil)
-				self.state = .idle
-				Notifications.didPurchaseProduct.notify(product, info: Notification.purchaseFlagsDict(restored ? .restored : []))
-				self.delegate?.didPurchase(product: product, flags: restored ? .restored : [])
-			}
+			completion?(product, nil)
+			self.state = .idle
+			Notifications.didPurchaseProduct.notify(product, info: Notification.purchaseFlagsDict(restored ? .restored : []))
+			self.delegate?.didPurchase(product: product, flags: restored ? .restored : [])
 		}
 	}
 	
