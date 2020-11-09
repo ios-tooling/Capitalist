@@ -151,6 +151,7 @@ extension CapitalistManager {
 		}
 		
 		func callValidationCompletions() {
+			callRefreshCompletions(with: nil)
 			let completions = self.validationCompletions
 			self.currentCheckingHash = nil
 			self.validationCompletions = []
