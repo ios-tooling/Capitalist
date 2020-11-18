@@ -140,7 +140,7 @@ extension CapitalistManager {
 		}
 		public var expirationDateString: String {
 			guard let date = subscriptionExpirationDate else { return "--" }
-			return DateFormatter.pretty.string(from: date)
+			return DateFormatter.buildPretty().string(from: date)
 		}
 		
 		public var quantity: Int { return Int(any: self.info?["quantity"] ?? "") }
@@ -217,7 +217,7 @@ extension CapitalistManager {
 			}
 			
 			func string(from date: Date) -> String {
-				DateFormatter.pretty.string(from: date)
+				DateFormatter.buildPretty().string(from: date)
 			}
 		}
 
@@ -237,28 +237,29 @@ extension CapitalistManager {
 }
 
 extension DateFormatter {
-	static let pretty: DateFormatter = {
-		let prettyFormatter = DateFormatter()
-		prettyFormatter.dateStyle = .short
-		prettyFormatter.timeStyle = .short
+    static func buildPretty() -> DateFormatter {
+        let prettyFormatter = DateFormatter()
+        prettyFormatter.dateStyle = .short
+        prettyFormatter.timeStyle = .short
 
-		return prettyFormatter
-	}()
+        return prettyFormatter
+    }
+	static let pretty = buildPretty()
 }
 
 
 extension String {
-	static let capitalistFormatter: DateFormatter = {
+	static func capitalistFormatter() -> DateFormatter {
 		let formatter = DateFormatter()
 		formatter.dateFormat = "yyyy-MM-dd HH:mm:ss VV"
 		
 		return formatter
-	}()
+	}
 	
 	func toCapitalistDate() -> Date? {
 		//formatter.dateFormat = "yyyy-MM-dd HH:mm:ss z"
 					
-		return String.capitalistFormatter.date(from: self)
+		return String.capitalistFormatter().date(from: self)
 	}
 }
 
