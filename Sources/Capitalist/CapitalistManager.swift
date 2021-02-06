@@ -21,7 +21,7 @@ public class CapitalistManager: NSObject {
 	public var waitingPurchases: [Product.ID] = []
 	public var receipt: Receipt!
 	public var cacheDecryptedReceipts = true
-	public var useSandbox = !Gestalt.isProductionBuild
+	public var useSandbox = Gestalt.distribution != .appStore
 	public var allProductIDs: [Product.ID] = []
 	public var purchaseTimeOut = TimeInterval.minute * 2
 	public var purchasedConsumables: [ConsumablePurchase] = []
