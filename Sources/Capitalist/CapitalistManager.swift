@@ -25,27 +25,40 @@ public class CapitalistManager: NSObject {
 	public var allProductIDs: [Product.ID] = []
 	public var purchaseTimeOut = TimeInterval.minute * 2
 	public var purchasedConsumables: [ConsumablePurchase] = []
-	public weak var delegate: CapitalistManagerDelegate?
 	public var loggingOn = false
 	public var subscriptionManagementURL = URL(string: "https://finance-app.itunes.apple.com/account/subscriptions")!
 	
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
 
+	private weak var delegate: CapitalistManagerDelegate?
+	private var isSetup = false
 	private var purchaseQueue = DispatchQueue(label: "purchasing")
 	private var purchaseCompletion: ((Product?, Error?) -> Void)?
 	private weak var purchaseTimeOutTimer: Timer?
 
-	public func setup(with secret: String, productIDs: [Product.ID], refreshReceipt: Bool = true) {
+	public func setup(delegate: CapitalistManagerDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false) {
+		if isSetup {
+			print("CapitalistManager.setup() should only be called once.")
+			return
+		}
+		
+		isSetup = true
+		self.delegate = delegate
 		SKPaymentQueue.default().add(self)
 		CapitalistManager.Receipt.appSpecificSharedSecret = secret
-		self.allProductIDs = productIDs
-		self.receipt = Receipt()
-		self.requestProducts()
-		if refreshReceipt { self.checkForPurchases() }
+		allProductIDs = productIDs
+		receipt = Receipt()
+		requestProducts()
+		if refreshReceipt { checkForPurchases() }
 	}
 	
 	public func checkForPurchases() {
 		self.receipt.refresh()
+	}
+	
+	@available(iOS 14.0, *)
+	public func presentCodeRedemptionSheet() {
+		SKPaymentQueue.default().presentCodeRedemptionSheet()
 	}
 	
 	public func hasPurchased(_ product: Product.ID) -> Bool {
@@ -205,6 +218,12 @@ extension CapitalistManager: SKPaymentTransactionObserver {
 			}
 		}
 	}
+	
+	func paymentQueue(_ queue: SKPaymentQueue, shouldAddStorePayment payment: SKPayment, for product: SKProduct) -> Bool {
+		true
+	}
+	
+	
 	
 	func failPurchase(of product: Product?, dueTo error: Error?) {
 		guard let prod = product else {
