@@ -219,7 +219,7 @@ extension CapitalistManager: SKPaymentTransactionObserver {
 		}
 	}
 	
-	func paymentQueue(_ queue: SKPaymentQueue, shouldAddStorePayment payment: SKPayment, for product: SKProduct) -> Bool {
+	public func paymentQueue(_ queue: SKPaymentQueue, shouldAddStorePayment payment: SKPayment, for product: SKProduct) -> Bool {
 		true
 	}
 	
