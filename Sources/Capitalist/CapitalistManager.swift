@@ -35,6 +35,7 @@ public class CapitalistManager: NSObject {
 	private var purchaseQueue = DispatchQueue(label: "purchasing")
 	private var purchaseCompletion: ((Product?, Error?) -> Void)?
 	private weak var purchaseTimeOutTimer: Timer?
+    private var productsRequest: SKProductsRequest?
 
 	public func setup(delegate: CapitalistManagerDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false) {
 		if isSetup {
@@ -284,12 +285,12 @@ extension CapitalistManager: SKProductsRequestDelegate {
 	func requestProducts(productIDs: [Product.ID]? = nil ) {
 		if self.state != .idle { return }
 		
+        self.state = .fetchingProducts
 		self.purchaseQueue.suspend()
 		let products = productIDs ?? self.allProductIDs
-		let request = SKProductsRequest(productIdentifiers: Set(products.map({ $0.rawValue })))
-		request.delegate = self
-		request.start()
-		
+        self.productsRequest = SKProductsRequest(productIdentifiers: Set(products.map({ $0.rawValue })))
+        productsRequest?.delegate = self
+        productsRequest?.start()
 	}
 	
 	public func productsRequest(_ request: SKProductsRequest, didReceive response: SKProductsResponse) {
