@@ -4,11 +4,10 @@
 
 import Foundation
 import StoreKit
-import Studio
 
 /// Call CapitalistManager.instance.setup(with: Secret, productIDs: [Product IDs]) in AppDelegate.didFinishLaunching
 
-public protocol CapitalistManagerDelegate: class {
+public protocol CapitalistManagerDelegate: AnyObject {
 	func didFetchProducts()
 	func didPurchase(product: CapitalistManager.Product, flags: CapitalistManager.PurchaseFlag)
 }
@@ -21,9 +20,9 @@ public class CapitalistManager: NSObject {
 	public var waitingPurchases: [Product.ID] = []
 	public var receipt: Receipt!
 	public var cacheDecryptedReceipts = true
-	public var useSandbox = Gestalt.distribution != .appStore
+	public var useSandbox = CapitalistManager.distribution != .appStore
 	public var allProductIDs: [Product.ID] = []
-	public var purchaseTimeOut = TimeInterval.minute * 2
+    public var purchaseTimeOut: TimeInterval = 120
 	public var purchasedConsumables: [ConsumablePurchase] = []
 	public var loggingOn = false
 	public var subscriptionManagementURL = URL(string: "https://finance-app.itunes.apple.com/account/subscriptions")!
@@ -59,7 +58,9 @@ public class CapitalistManager: NSObject {
 	
 	@available(iOS 14.0, *)
 	public func presentCodeRedemptionSheet() {
-		SKPaymentQueue.default().presentCodeRedemptionSheet()
+        #if os(iOS)
+            SKPaymentQueue.default().presentCodeRedemptionSheet()
+        #endif
 	}
 	
 	public func hasPurchased(_ product: Product.ID) -> Bool {
@@ -94,7 +95,7 @@ public class CapitalistManager: NSObject {
 	}
 	
 	public func restorePurchases(justUsingReceipt: Bool = true) {
-		if justUsingReceipt, !Gestalt.isAttachedToDebugger {
+		if justUsingReceipt {
 			self.receipt.refresh()
 		} else {
 			SKPaymentQueue.default().restoreCompletedTransactions()
@@ -122,7 +123,7 @@ public class CapitalistManager: NSObject {
 		guard let product = self.product(for: id), let skProduct = product.product else {
 			completion?(nil, CapitalistError.productNotFound)
 
-			Notifications.didFailToPurchaseProduct.notify(id, info: ["error": CapitalistError.productNotFound])
+            NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: id, userInfo: ["error": CapitalistError.productNotFound])
 
 			return false
 		}
@@ -133,13 +134,13 @@ public class CapitalistManager: NSObject {
 		}
 
 		self.state = .purchasing(product)
-		Notifications.startingProductPurchase.notify()
+        NotificationCenter.default.post(name: Notifications.startingProductPurchase, object: nil)
 		
 		self.purchaseCompletion = completion
 		self.purchaseQueue.async {
 			if product.id.kind == .nonConsumable, self.hasPurchased(product.id) {
 				self.purchaseCompletion?(product, nil)
-				Notifications.didPurchaseProduct.notify(product, info: Notification.purchaseFlagsDict(.prepurchased))
+                NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: product, userInfo: Notification.purchaseFlagsDict(.prepurchased))
 				self.delegate?.didPurchase(product: product, flags: .prepurchased)
 				self.state = .idle
 				return
@@ -169,7 +170,7 @@ public class CapitalistManager: NSObject {
 			if let err = error { print("Error when loading local receipt: \(err)") }
 			completion?(product, nil)
 			self.state = .idle
-			Notifications.didPurchaseProduct.notify(product, info: Notification.purchaseFlagsDict(restored ? .restored : []))
+            NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: product, userInfo: Notification.purchaseFlagsDict(restored ? .restored : []))
 			self.delegate?.didPurchase(product: product, flags: restored ? .restored : [])
 		}
 	}
@@ -233,7 +234,9 @@ extension CapitalistManager: SKPaymentTransactionObserver {
 		}
 		
 		let completion = self.purchaseCompletion
-		self.waitingPurchases.remove(prod.id)
+        if let index = waitingPurchases.firstIndex(of: prod.id) {
+            waitingPurchases.remove(at: index)
+        }
 		
 		self.purchaseCompletion = nil
 
@@ -241,7 +244,7 @@ extension CapitalistManager: SKPaymentTransactionObserver {
 			var userInfo: [String: Any]? = error != nil ? ["error": error!] : nil
 			if let err = error as? SKError, err.code == .paymentCancelled || err.code == .paymentNotAllowed { userInfo = nil }
 			self.state = .idle
-			Notifications.didFailToPurchaseProduct.notify(prod, info: userInfo)
+            NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: prod, userInfo: userInfo)
 		}
 
 		completion?(product, error)
@@ -305,7 +308,7 @@ extension CapitalistManager: SKProductsRequestDelegate {
 		
 		self.receipt.updateCachedReceipt(label: "Product Request Completed")
 		self.purchaseQueue.resume()
-		Notifications.didFetchProducts.notify()
+        NotificationCenter.default.post(name: Notifications.didFetchProducts, object: nil)
 		self.delegate?.didFetchProducts()
 	}
 	
@@ -332,7 +335,7 @@ extension SKPaymentTransaction {
 		var text = "\(self.payment.productIdentifier) - \(self.transactionState.description)"
 		
 		if let date = self.transactionDate {
-			text += " at \(date.localTimeString())"
+			text += " at \(date.description)"
 		}
 		
 		return text
@@ -358,4 +361,25 @@ extension Error {
 		
 		return (err as NSError?)?.code == 2 && (err as NSError?)?.domain == SKErrorDomain
 	}
+}
+
+extension CapitalistManager {
+    public enum Distribution { case development, testflight, appStore }
+
+    public static var distribution: Distribution {
+        #if DEBUG
+            return .development
+        #else
+        #if os(OSX)
+            let bundlePath = Bundle.main.bundleURL
+            let receiptURL = bundlePath.appendingPathComponent("Contents").appendingPathComponent("_MASReceipt").appendingPathComponent("receipt")
+            
+            return FileManager.default.fileExists(at: receiptURL) ? .appStore : .development
+        #endif
+            if isOnSimulator { return .development }
+            if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" && MobileProvisionFile.default?.properties["ProvisionedDevices"] == nil { return .testflight }
+            
+            return .appStore
+        #endif
+    }
 }

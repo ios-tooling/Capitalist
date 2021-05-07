@@ -4,7 +4,6 @@
 
 import Foundation
 import StoreKit
-import Studio
 
 public typealias CapitalistCallback = () -> Void
 public typealias CapitalistErrorCallback = (Error?) -> Void
@@ -99,7 +98,7 @@ extension CapitalistManager {
 				self.validate(data: receipt) {
 					self.isValidating = false
 					DispatchQueue.main.async {
-						Notifications.didRefreshReceipt.notify()
+                        NotificationCenter.default.post(name: Notifications.didRefreshReceipt, object: nil)
 						completion?(nil)
 					}
 				}
