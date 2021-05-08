@@ -14,7 +14,7 @@ public protocol CapitalistManagerDelegate: AnyObject {
 
 public class CapitalistManager: NSObject {
 	public static let instance = CapitalistManager()
-
+	
 	public var purchasedProducts: [Product.ID] = []
 	public var availableProducts: [Product.ID: Product] = [:]
 	public var waitingPurchases: [Product.ID] = []
@@ -22,20 +22,20 @@ public class CapitalistManager: NSObject {
 	public var cacheDecryptedReceipts = true
 	public var useSandbox = CapitalistManager.distribution != .appStore
 	public var allProductIDs: [Product.ID] = []
-    public var purchaseTimeOut: TimeInterval = 120
+	public var purchaseTimeOut: TimeInterval = 120
 	public var purchasedConsumables: [ConsumablePurchase] = []
 	public var loggingOn = false
 	public var subscriptionManagementURL = URL(string: "https://finance-app.itunes.apple.com/account/subscriptions")!
 	
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
-
+	
 	private weak var delegate: CapitalistManagerDelegate?
 	private var isSetup = false
 	private var purchaseQueue = DispatchQueue(label: "purchasing")
 	private var purchaseCompletion: ((Product?, Error?) -> Void)?
 	private weak var purchaseTimeOutTimer: Timer?
-    private var productsRequest: SKProductsRequest?
-
+	private var productsRequest: SKProductsRequest?
+	
 	public func setup(delegate: CapitalistManagerDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false) {
 		if isSetup {
 			print("CapitalistManager.setup() should only be called once.")
@@ -58,9 +58,9 @@ public class CapitalistManager: NSObject {
 	
 	@available(iOS 14.0, *)
 	public func presentCodeRedemptionSheet() {
-        #if os(iOS)
-            SKPaymentQueue.default().presentCodeRedemptionSheet()
-        #endif
+		#if os(iOS)
+		SKPaymentQueue.default().presentCodeRedemptionSheet()
+		#endif
 	}
 	
 	public func hasPurchased(_ product: Product.ID) -> Bool {
@@ -105,7 +105,7 @@ public class CapitalistManager: NSObject {
 	public func product(for id: Product.ID) -> Product? {
 		return self.availableProducts[id]
 	}
-
+	
 	public func canPurchase(_ id: Product.ID) -> Bool {
 		if self.state != .idle, self.state != .restoring { return false }
 		guard !id.isPrepurchased, let product = self.product(for: id), product.product != nil else { return false }
@@ -122,34 +122,34 @@ public class CapitalistManager: NSObject {
 	public func purchase(_ id: Product.ID, completion: ((Product?, Error?) -> Void)? = nil) -> Bool {
 		guard let product = self.product(for: id), let skProduct = product.product else {
 			completion?(nil, CapitalistError.productNotFound)
-
-            NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: id, userInfo: ["error": CapitalistError.productNotFound])
-
+			
+			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: id, userInfo: ["error": CapitalistError.productNotFound])
+			
 			return false
 		}
-
+		
 		guard self.state == .idle else {
 			completion?(product, CapitalistError.purchaseAlreadyInProgress)
 			return false
 		}
-
+		
 		self.state = .purchasing(product)
-        NotificationCenter.default.post(name: Notifications.startingProductPurchase, object: nil)
+		NotificationCenter.default.post(name: Notifications.startingProductPurchase, object: nil)
 		
 		self.purchaseCompletion = completion
 		self.purchaseQueue.async {
 			if product.id.kind == .nonConsumable, self.hasPurchased(product.id) {
 				self.purchaseCompletion?(product, nil)
-                NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: product, userInfo: Notification.purchaseFlagsDict(.prepurchased))
+				NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: product, userInfo: Notification.purchaseFlagsDict(.prepurchased))
 				self.delegate?.didPurchase(product: product, flags: .prepurchased)
 				self.state = .idle
 				return
 			}
-					
+			
 			self.purchaseTimeOutTimer = Timer.scheduledTimer(withTimeInterval: self.purchaseTimeOut, repeats: false) { _ in
 				self.failPurchase(of: product, dueTo: CapitalistError.requestTimedOut)
 			}
-
+			
 			let payment = SKPayment(product: skProduct)
 			SKPaymentQueue.default().add(payment)
 		}
@@ -162,15 +162,15 @@ public class CapitalistManager: NSObject {
 		if product.id.kind == .consumable, let purchasedAt = date {
 			self.recordConsumablePurchase(of: product.id, at: purchasedAt)
 		}
-
+		
 		let completion = self.purchaseCompletion
 		self.purchaseCompletion = nil
-
+		
 		self.receipt.loadBundleReceipt { error in
 			if let err = error { print("Error when loading local receipt: \(err)") }
 			completion?(product, nil)
 			self.state = .idle
-            NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: product, userInfo: Notification.purchaseFlagsDict(restored ? .restored : []))
+			NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: product, userInfo: Notification.purchaseFlagsDict(restored ? .restored : []))
 			self.delegate?.didPurchase(product: product, flags: restored ? .restored : [])
 		}
 	}
@@ -234,19 +234,19 @@ extension CapitalistManager: SKPaymentTransactionObserver {
 		}
 		
 		let completion = self.purchaseCompletion
-        if let index = waitingPurchases.firstIndex(of: prod.id) {
-            waitingPurchases.remove(at: index)
-        }
+		if let index = waitingPurchases.firstIndex(of: prod.id) {
+			waitingPurchases.remove(at: index)
+		}
 		
 		self.purchaseCompletion = nil
-
+		
 		if self.state == .purchasing(prod) {
 			var userInfo: [String: Any]? = error != nil ? ["error": error!] : nil
 			if let err = error as? SKError, err.code == .paymentCancelled || err.code == .paymentNotAllowed { userInfo = nil }
 			self.state = .idle
-            NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: prod, userInfo: userInfo)
+			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: prod, userInfo: userInfo)
 		}
-
+		
 		completion?(product, error)
 		print("Failed to purchase \(prod), \(error?.localizedDescription ?? "no error description").")
 	}
@@ -288,12 +288,12 @@ extension CapitalistManager: SKProductsRequestDelegate {
 	func requestProducts(productIDs: [Product.ID]? = nil ) {
 		if self.state != .idle { return }
 		
-        self.state = .fetchingProducts
+		self.state = .fetchingProducts
 		self.purchaseQueue.suspend()
 		let products = productIDs ?? self.allProductIDs
-        self.productsRequest = SKProductsRequest(productIdentifiers: Set(products.map({ $0.rawValue })))
-        productsRequest?.delegate = self
-        productsRequest?.start()
+		self.productsRequest = SKProductsRequest(productIdentifiers: Set(products.map({ $0.rawValue })))
+		productsRequest?.delegate = self
+		productsRequest?.start()
 	}
 	
 	public func productsRequest(_ request: SKProductsRequest, didReceive response: SKProductsResponse) {
@@ -308,7 +308,7 @@ extension CapitalistManager: SKProductsRequestDelegate {
 		
 		self.receipt.updateCachedReceipt(label: "Product Request Completed")
 		self.purchaseQueue.resume()
-        NotificationCenter.default.post(name: Notifications.didFetchProducts, object: nil)
+		NotificationCenter.default.post(name: Notifications.didFetchProducts, object: nil)
 		self.delegate?.didFetchProducts()
 	}
 	
@@ -364,22 +364,25 @@ extension Error {
 }
 
 extension CapitalistManager {
-    public enum Distribution { case development, testflight, appStore }
-
-    public static var distribution: Distribution {
-        #if DEBUG
-            return .development
-        #else
-        #if os(OSX)
-            let bundlePath = Bundle.main.bundleURL
-            let receiptURL = bundlePath.appendingPathComponent("Contents").appendingPathComponent("_MASReceipt").appendingPathComponent("receipt")
-            
-            return FileManager.default.fileExists(at: receiptURL) ? .appStore : .development
-        #endif
-            if isOnSimulator { return .development }
-            if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" && MobileProvisionFile.default?.properties["ProvisionedDevices"] == nil { return .testflight }
-            
-            return .appStore
-        #endif
-    }
+	public enum Distribution { case development, testflight, appStore }
+	
+	public static var distribution: Distribution {
+		#if DEBUG
+			return .development
+		#else
+			#if os(OSX)
+				let bundlePath = Bundle.main.bundleURL
+				let receiptURL = bundlePath.appendingPathComponent("Contents").appendingPathComponent("_MASReceipt").appendingPathComponent("receipt")
+				
+				return FileManager.default.fileExists(at: receiptURL) ? .appStore : .development
+			#endif
+			#if targetEnvironment(simulator)
+				return .development
+			#else
+				if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" && MobileProvisionFile.default?.properties["ProvisionedDevices"] == nil { return .testflight }
+			
+				return .appStore
+			#endif
+		#endif
+	}
 }
