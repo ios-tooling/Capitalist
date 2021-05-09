@@ -129,7 +129,7 @@ extension CapitalistManager {
 			let task = URLSession.shared.dataTask(with: request) { result, response, error in
 				if let err = error { print("Error when validating receipt: \(err)") }
 				if let data = result, let info = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any], let status = info["status"] as? Int {
-					if status == 21007, !CapitalistManager.instance.useSandbox { // if the server sends back a 21007, we're in the Sandbox. Happens during AppReview
+					if (status == 21007 || (info["environment"] as? String) == "Sandbox"), !CapitalistManager.instance.useSandbox { // if the server sends back a 21007, we're in the Sandbox. Happens during AppReview
 						CapitalistManager.instance.useSandbox = true
 						self.currentCheckingHash = nil
 						self.validate(data: receiptData, completion: completion)

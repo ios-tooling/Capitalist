@@ -93,6 +93,10 @@ public class CapitalistManager: NSObject {
 		if self.isPurchasing(products: products) { return .purchasing }
 		return .none
 	}
+
+	public var activeSubscriptions: [CapitalistManager.Product] {
+		Array(availableProducts.values).filter { $0.isSubscriptionActive }
+	}
 	
 	public func restorePurchases(justUsingReceipt: Bool = true) {
 		if justUsingReceipt {

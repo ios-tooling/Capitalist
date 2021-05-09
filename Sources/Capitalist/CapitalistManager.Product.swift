@@ -107,7 +107,7 @@ extension CapitalistManager {
 		
 		var info: [String: Any]?
 		public let id: CapitalistManager.Product.ID
-		var product: SKProduct?
+		public var product: SKProduct?
 		static let currencyFormatter: NumberFormatter = {
 			let formatter = NumberFormatter()
 			formatter.numberStyle = .currency
@@ -119,6 +119,7 @@ extension CapitalistManager {
 			return ExpirationReason(rawValue: reason)
 		}
 		
+		public var title: String? { self.product?.localizedTitle }
 		public var rawPrice: Double? { return self.product?.price.doubleValue }
 		public var price: NSDecimalNumber? { return self.product?.price }
 		public var localizedPrice: String? {
