@@ -1,5 +1,5 @@
 //
-//  CapitalistManagerEnums.swift
+//  CapitalistEnums.swift
 //  
 //
 //  Created by ben on 5/5/20.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension CapitalistManager {
+extension Capitalist {
 	public struct PurchaseFlag : OptionSet, Equatable {
 		public static func ==(lhs: PurchaseFlag, rhs: PurchaseFlag) -> Bool {
 			return lhs.rawValue == rhs.rawValue
@@ -45,10 +45,10 @@ extension CapitalistManager {
 
 extension Notification {
 	public static let purchaseFlagsKey = "Capitalist:PurchaseFlags"
-	public var purchaseFlags: CapitalistManager.PurchaseFlag {
-		return self.userInfo?[Notification.purchaseFlagsKey] as? CapitalistManager.PurchaseFlag ?? []
+	public var purchaseFlags: Capitalist.PurchaseFlag {
+		return self.userInfo?[Notification.purchaseFlagsKey] as? Capitalist.PurchaseFlag ?? []
 	}
-	public static func purchaseFlagsDict(_ flags: CapitalistManager.PurchaseFlag) -> [String: Any] {
+	public static func purchaseFlagsDict(_ flags: Capitalist.PurchaseFlag) -> [String: Any] {
 		return [Notification.purchaseFlagsKey: flags]
 	}
 }

@@ -18,9 +18,9 @@ import Foundation
 #endif
 
 open class ProductWatcher: NSObject {
-	public let productID: CapitalistManager.Product.ID
-	public var product: CapitalistManager.Product? {
-		CapitalistManager.instance.product(for: self.productID)
+	public let productID: Capitalist.Product.ID
+	public var product: Capitalist.Product? {
+		Capitalist.instance.product(for: self.productID)
 	}
 	
 	#if os(OSX)
@@ -34,13 +34,13 @@ open class ProductWatcher: NSObject {
 	open var purchasingViews: [CapitalistView] = []
 	open var notPurchasedViews: [CapitalistView] = []
 
-	public init(productID: CapitalistManager.Product.ID) {
+	public init(productID: Capitalist.Product.ID) {
 		self.productID = productID
 		super.init()
 
-        NotificationCenter.default.addObserver(self, selector: #selector(purchaseStateChanged), name: CapitalistManager.Notifications.didPurchaseProduct, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(purchaseStateChanged), name: CapitalistManager.Notifications.didFailToPurchaseProduct, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(purchaseStateChanged), name: CapitalistManager.Notifications.startingProductPurchase, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(purchaseStateChanged), name: Capitalist.Notifications.didPurchaseProduct, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(purchaseStateChanged), name: Capitalist.Notifications.didFailToPurchaseProduct, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(purchaseStateChanged), name: Capitalist.Notifications.startingProductPurchase, object: nil)
 	}
 	
 	open func addPurchasedView(_ view: CapitalistView) { self.purchasedViews.append(view) }
@@ -52,7 +52,7 @@ open class ProductWatcher: NSObject {
 	}
 	
 	open func updateControls() {
-		switch CapitalistManager.instance.purchasePhase(of: self.productID) {
+		switch Capitalist.instance.purchasePhase(of: self.productID) {
 		case .prepurchased:
 			self.purchasingViews.forEach { $0.isHidden = true }
 			self.notPurchasedViews.forEach { $0.isHidden = true }

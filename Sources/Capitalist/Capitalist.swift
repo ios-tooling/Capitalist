@@ -1,26 +1,26 @@
 //
-//  CapitalistManager.swift
+//  Capitalist.swift
 //
 
 import Foundation
 import StoreKit
 
-/// Call CapitalistManager.instance.setup(with: Secret, productIDs: [Product IDs]) in AppDelegate.didFinishLaunching
+/// Call Capitalist.instance.setup(with: Secret, productIDs: [Product IDs]) in AppDelegate.didFinishLaunching
 
-public protocol CapitalistManagerDelegate: AnyObject {
+public protocol CapitalistDelegate: AnyObject {
 	func didFetchProducts()
-	func didPurchase(product: CapitalistManager.Product, flags: CapitalistManager.PurchaseFlag)
+	func didPurchase(product: Capitalist.Product, flags: Capitalist.PurchaseFlag)
 }
 
-public class CapitalistManager: NSObject {
-	public static let instance = CapitalistManager()
+public class Capitalist: NSObject {
+	public static let instance = Capitalist()
 	
 	public var purchasedProducts: [Product.ID] = []
 	public var availableProducts: [Product.ID: Product] = [:]
 	public var waitingPurchases: [Product.ID] = []
 	public var receipt: Receipt!
 	public var cacheDecryptedReceipts = true
-	public var useSandbox = CapitalistManager.distribution != .appStore
+	public var useSandbox = Capitalist.distribution != .appStore
 	public var allProductIDs: [Product.ID] = []
 	public var purchaseTimeOut: TimeInterval = 120
 	public var purchasedConsumables: [ConsumablePurchase] = []
@@ -29,23 +29,23 @@ public class CapitalistManager: NSObject {
 	
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
 	
-	private weak var delegate: CapitalistManagerDelegate?
+	private weak var delegate: CapitalistDelegate?
 	private var isSetup = false
 	private var purchaseQueue = DispatchQueue(label: "purchasing")
 	private var purchaseCompletion: ((Product?, Error?) -> Void)?
 	private weak var purchaseTimeOutTimer: Timer?
 	private var productsRequest: SKProductsRequest?
 	
-	public func setup(delegate: CapitalistManagerDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false) {
+	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false) {
 		if isSetup {
-			print("CapitalistManager.setup() should only be called once.")
+			print("Capitalist.setup() should only be called once.")
 			return
 		}
 		
 		isSetup = true
 		self.delegate = delegate
 		SKPaymentQueue.default().add(self)
-		CapitalistManager.Receipt.appSpecificSharedSecret = secret
+		Capitalist.Receipt.appSpecificSharedSecret = secret
 		allProductIDs = productIDs
 		receipt = Receipt()
 		requestProducts()
@@ -94,7 +94,7 @@ public class CapitalistManager: NSObject {
 		return .none
 	}
 
-	public var activeSubscriptions: [CapitalistManager.Product] {
+	public var activeSubscriptions: [Capitalist.Product] {
 		Array(availableProducts.values).filter { $0.isSubscriptionActive }
 	}
 	
@@ -163,6 +163,18 @@ public class CapitalistManager: NSObject {
 	
 	func recordPurchase(of product: Product, at date: Date?, restored: Bool) {
 		if !purchasedProducts.contains(product.id) || product.id.kind == .consumable { self.purchasedProducts.append(product.id) }
+		
+		if let purchasedAt = date {
+			switch product.id.kind {
+			case .consumable:
+				self.recordConsumablePurchase(of: product.id, at: purchasedAt)
+				
+			case .subscription:
+				availableProducts[product.id]?.recentPurchaseDate = purchasedAt
+				
+			default: break
+			}
+		}
 		if product.id.kind == .consumable, let purchasedAt = date {
 			self.recordConsumablePurchase(of: product.id, at: purchasedAt)
 		}
@@ -189,7 +201,7 @@ public class CapitalistManager: NSObject {
 	}
 }
 
-extension CapitalistManager: SKPaymentTransactionObserver {
+extension Capitalist: SKPaymentTransactionObserver {
 	public func clearOpenTransactions() {
 		let queue = SKPaymentQueue.default()
 		let transactions = queue.transactions
@@ -256,7 +268,7 @@ extension CapitalistManager: SKPaymentTransactionObserver {
 	}
 }
 
-extension CapitalistManager: SKRequestDelegate {
+extension Capitalist: SKRequestDelegate {
 	public func requestDidFinish(_ request: SKRequest) {
 		switch self.state {
 		case .restoring:
@@ -288,7 +300,7 @@ extension CapitalistManager: SKRequestDelegate {
 	}
 }
 
-extension CapitalistManager: SKProductsRequestDelegate {
+extension Capitalist: SKProductsRequestDelegate {
 	func requestProducts(productIDs: [Product.ID]? = nil ) {
 		if self.state != .idle { return }
 		
@@ -367,7 +379,7 @@ extension Error {
 	}
 }
 
-extension CapitalistManager {
+extension Capitalist {
 	public enum Distribution { case development, testflight, appStore }
 	
 	public static var distribution: Distribution {

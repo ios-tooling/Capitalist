@@ -1,5 +1,5 @@
 //
-//  CapitalistManager.Notifications.swift
+//  Capitalist.Notifications.swift
 //  
 //
 //  Created by ben on 5/5/20.
@@ -9,17 +9,17 @@ import Foundation
 
 
 
-extension CapitalistManager {
+extension Capitalist {
 	public struct Notifications {
-		public static let didFetchProducts = Notification.Name("CapitalistManager.didFetchProducts")
-		public static let didRefreshReceipt = Notification.Name("CapitalistManager.didRefreshReceipt")
+		public static let didFetchProducts = Notification.Name("Capitalist.didFetchProducts")
+		public static let didRefreshReceipt = Notification.Name("Capitalist.didRefreshReceipt")
 
-		public static let startingProductPurchase = Notification.Name("CapitalistManager.startingProductPurchase")
-		public static let didPurchaseProduct = Notification.Name("CapitalistManager.didPurchaseProduct")
-		public static let didFailToPurchaseProduct = Notification.Name("CapitalistManager.didFailToPurchaseProduct")
+		public static let startingProductPurchase = Notification.Name("Capitalist.startingProductPurchase")
+		public static let didPurchaseProduct = Notification.Name("Capitalist.didPurchaseProduct")
+		public static let didFailToPurchaseProduct = Notification.Name("Capitalist.didFailToPurchaseProduct")
 
-		public static let startingProductTrial = Notification.Name("CapitalistManager.startingProductTrial")
-		public static let didTrialProduct = Notification.Name("CapitalistManager.didTrialProduct")
-		public static let didFailToTrialProduct = Notification.Name("CapitalistManager.didFailToTrialProduct")
+		public static let startingProductTrial = Notification.Name("Capitalist.startingProductTrial")
+		public static let didTrialProduct = Notification.Name("Capitalist.didTrialProduct")
+		public static let didFailToTrialProduct = Notification.Name("Capitalist.didFailToTrialProduct")
 	}
 }

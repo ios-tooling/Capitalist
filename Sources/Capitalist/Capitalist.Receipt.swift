@@ -1,5 +1,5 @@
 //
-//  CapitalistManager.Receipt.swift
+//  Capitalist.Receipt.swift
 //
 
 import Foundation
@@ -8,8 +8,8 @@ import StoreKit
 public typealias CapitalistCallback = () -> Void
 public typealias CapitalistErrorCallback = (Error?) -> Void
 
-extension CapitalistManager {	
-	public func currentExpirationDate(for productIDs: [Product.ID] = CapitalistManager.instance.allProductIDs) -> Date? {
+extension Capitalist {	
+	public func currentExpirationDate(for productIDs: [Product.ID] = Capitalist.instance.allProductIDs) -> Date? {
 		var newest: Date?
 
 		for id in productIDs {
@@ -34,7 +34,7 @@ extension CapitalistManager {
 		for receipt in receipts {
 			guard
 				let id = self.productID(from: receipt["product_id"] as? String ?? ""),
-				let product = CapitalistManager.instance.product(for: id) ?? CapitalistManager.Product(product: nil, id: id)
+				let product = Capitalist.instance.product(for: id) ?? Capitalist.Product(product: nil, id: id)
 			else { continue }
 			
 			if self.availableProducts[id] == nil { self.availableProducts[id] = product }
@@ -75,7 +75,7 @@ extension CapitalistManager {
 			if let comp = completion { self.refreshCompletions.append(comp) }
 			
 			if self.isRefreshing { return }
-			if CapitalistManager.instance.loggingOn { print("Refreshing Receipt") }
+			if Capitalist.instance.loggingOn { print("Refreshing Receipt") }
 			let op = SKReceiptRefreshRequest(receiptProperties: nil)
 			self.isRefreshing = true
 
@@ -85,10 +85,10 @@ extension CapitalistManager {
 		
 		func updateCachedReceipt(label: String, receipt: [String: Any]? = nil) {
 			if receipt != nil { cachedReciept = receipt }
-			if let recp = self.cachedReciept?["receipt"] as? [String: Any], let inApp = recp["in_app"] as? [[String: Any]] { CapitalistManager.instance.load(receipts: inApp) }
-			if let info = self.cachedReciept?["latest_receipt_info"] as? [[String: Any]] { CapitalistManager.instance.load(receipts: info) }
+			if let recp = self.cachedReciept?["receipt"] as? [String: Any], let inApp = recp["in_app"] as? [[String: Any]] { Capitalist.instance.load(receipts: inApp) }
+			if let info = self.cachedReciept?["latest_receipt_info"] as? [[String: Any]] { Capitalist.instance.load(receipts: info) }
 			
-			if CapitalistManager.instance.loggingOn { CapitalistManager.instance.logCurrentProducts(label: label) }
+			if Capitalist.instance.loggingOn { Capitalist.instance.logCurrentProducts(label: label) }
 		}
 		
 		@discardableResult
@@ -104,7 +104,7 @@ extension CapitalistManager {
 				}
 				return true
 			}
-			if CapitalistManager.instance.loggingOn { print("No local receipt found") }
+			if Capitalist.instance.loggingOn { print("No local receipt found") }
 			return false
 		}
 
@@ -121,7 +121,7 @@ extension CapitalistManager {
 			
 			self.currentCheckingHash = hash
 			let dict: [String: Any] = ["receipt-data": receiptData.base64EncodedString(), "password": Receipt.appSpecificSharedSecret ?? "", "exclude-old-transactions": true]
-			let url = URL(string: "https://\(CapitalistManager.instance.useSandbox ? "sandbox" : "buy").itunes.apple.com/verifyReceipt")!
+			let url = URL(string: "https://\(Capitalist.instance.useSandbox ? "sandbox" : "buy").itunes.apple.com/verifyReceipt")!
 			var request = URLRequest(url: url)
 			request.httpBody = try! JSONSerialization.data(withJSONObject: dict, options: [])
 			request.httpMethod = "POST"
@@ -129,8 +129,8 @@ extension CapitalistManager {
 			let task = URLSession.shared.dataTask(with: request) { result, response, error in
 				if let err = error { print("Error when validating receipt: \(err)") }
 				if let data = result, let info = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any], let status = info["status"] as? Int {
-					if (status == 21007 || (info["environment"] as? String) == "Sandbox"), !CapitalistManager.instance.useSandbox { // if the server sends back a 21007, we're in the Sandbox. Happens during AppReview
-						CapitalistManager.instance.useSandbox = true
+					if (status == 21007 || (info["environment"] as? String) == "Sandbox"), !Capitalist.instance.useSandbox { // if the server sends back a 21007, we're in the Sandbox. Happens during AppReview
+						Capitalist.instance.useSandbox = true
 						self.currentCheckingHash = nil
 						self.validate(data: receiptData, completion: completion)
 						return
@@ -163,7 +163,7 @@ extension CapitalistManager {
 		
 		var lastValidReceiptData: Data? {
 			set {
-				if !CapitalistManager.instance.cacheDecryptedReceipts || newValue == nil {
+				if !Capitalist.instance.cacheDecryptedReceipts || newValue == nil {
 					try? FileManager.default.removeItem(at: lastValidReceiptDataURL)
 				} else {
 					try? newValue?.write(to: lastValidReceiptDataURL)
@@ -174,11 +174,11 @@ extension CapitalistManager {
 	}
 }
 
-extension CapitalistManager.Receipt: SKRequestDelegate {
+extension Capitalist.Receipt: SKRequestDelegate {
 	public func requestDidFinish(_ request: SKRequest) {
 		self.isRefreshing = false
 		if request is SKReceiptRefreshRequest {
-			if CapitalistManager.instance.loggingOn { print("Refresh Receipt Completed") }
+			if Capitalist.instance.loggingOn { print("Refresh Receipt Completed") }
 			loadBundleReceipt()
 		}
 	}
@@ -202,7 +202,7 @@ extension CapitalistManager.Receipt: SKRequestDelegate {
 	}
 }
 
-extension Array where Element == CapitalistManager.Product.ID {
+extension Array where Element == Capitalist.Product.ID {
 	func contains(_ productID: String) -> Bool {
 		return self.firstIndex(where: { $0.rawValue == productID }) != nil
 	}

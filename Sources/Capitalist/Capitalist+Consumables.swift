@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension CapitalistManager {
+extension Capitalist {
 	func recordConsumablePurchase(of id: Product.ID, at date: Date) {
 		let purchase = ConsumablePurchase(productID: id, date: date)
 		if !self.purchasedConsumables.contains(purchase) { self.purchasedConsumables.append(purchase) }

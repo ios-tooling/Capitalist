@@ -1,11 +1,11 @@
 //
-//  CapitalistManager.Product.swift
+//  Capitalist.Product.swift
 //
 
 import Foundation
 import StoreKit
 
-extension CapitalistManager {
+extension Capitalist {
 	public func purchasePhase(of product: Product.ID) -> ProductPurchsePhase {
 		if product.isPrepurchased { return .prepurchased }
 		if self.isPurchasing(product) { return .purchasing }
@@ -34,7 +34,7 @@ extension CapitalistManager {
 		}
 		
 		public init?(product: SKProduct?, id localID: ID? = nil, info: [String: Any]? = nil) {
-			guard let id = localID ?? CapitalistManager.instance.productID(from: product?.productIdentifier) else {
+			guard let id = localID ?? Capitalist.instance.productID(from: product?.productIdentifier) else {
 				self.id = .none
 				return nil
 			}
@@ -106,8 +106,9 @@ extension CapitalistManager {
 		}
 		
 		var info: [String: Any]?
-		public let id: CapitalistManager.Product.ID
+		public let id: Capitalist.Product.ID
 		public var product: SKProduct?
+		var recentPurchaseDate: Date?
 		static let currencyFormatter: NumberFormatter = {
 			let formatter = NumberFormatter()
 			formatter.numberStyle = .currency
@@ -130,7 +131,21 @@ extension CapitalistManager {
 		public var isInBillingRetryPeriod: Bool { return Bool(any: self.info?["is_in_billing_retry_period"]) }
 		public var isInIntroOfferPeriod: Bool { return Bool(any: self.info?["is_in_intro_offer_period"]) }
 		public var isInTrialPeriod: Bool { return Bool(any: self.info?["is_trial_period"]) }
-		public var subscriptionCancellationDate: Date? { return self.date(for: "cancellation_date") }
+		public var subscriptionCancellationDate: Date? {
+			if let date = self.date(for: "cancellation_date") { return date }
+			guard let recentPurchase = recentPurchaseDate, let duration = subscriptionDuration else { return nil }
+			
+			return recentPurchase.addingTimeInterval(duration)
+		}
+		public var subscriptionDuration: TimeInterval? {
+			if #available(iOS 11.2, *) {
+				guard id.kind == .subscription, let period = product?.subscriptionPeriod else { return nil }
+
+				return TimeInterval(period.numberOfUnits) * period.unit.timeInterval
+			} else {
+				return nil
+			}
+		}
 		public var subscriptionExpirationDate: Date? { return self.date(for: "expires_date") }
 		public var originalPurchaseDate: Date? { return self.date(for: "original_purchase_date") }
 		public var purchaseDate: Date? { return self.date(for: "purchase_date") }
@@ -172,11 +187,11 @@ extension CapitalistManager {
 					return .valid(validUntil)
 				}
 				
-				if CapitalistManager.instance.isPurchasing(products: [self.id]) { return .purchasing }
+				if Capitalist.instance.isPurchasing(products: [self.id]) { return .purchasing }
 				return .expired(validUntil)
 			}
 			
-			if CapitalistManager.instance.isPurchasing(products: [self.id]) { return .purchasing }
+			if Capitalist.instance.isPurchasing(products: [self.id]) { return .purchasing }
 			return .none
 		}
 		
@@ -184,7 +199,7 @@ extension CapitalistManager {
 			let state = self.subscriptionState
 			
 			if state.isExpired {
-				CapitalistManager.instance.receipt.refresh() { error in completion(self.subscriptionState) }
+				Capitalist.instance.receipt.refresh() { error in completion(self.subscriptionState) }
 			} else {
 				completion(self.subscriptionState)
 			}
@@ -269,5 +284,18 @@ extension Dictionary where Key == String {
 		guard let newString = self["purchase_date"] as? String, let newDate = newString.toCapitalistDate() else { return nil }
 		
 		return newDate
+	}
+}
+
+@available(iOS 11.2, *)
+extension SKProduct.PeriodUnit {
+	var timeInterval: TimeInterval {
+		switch self {
+		case .day: return 1440 * 60
+		case .week: return 7 * 1440 * 60
+		case .month: return 31 * 1440 * 60
+		case .year: return 365 * 1440 * 60
+		default: return 0
+		}
 	}
 }
