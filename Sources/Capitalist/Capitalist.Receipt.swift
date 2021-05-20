@@ -55,11 +55,13 @@ extension Capitalist {
 		public var isValidating = false
 		public var cachedReciept: [String: Any]?
 		var currentCheckingHash: Int?
+		var shouldValidateWithServer = true
 
 		var refreshCompletions: [(Error?) -> Void] = []
 		
-		override init() {
+		init(validating: Bool) {
 			super.init()
+			shouldValidateWithServer = validating
 			do {
 				if let data = lastValidReceiptData, let receipt = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
 					self.updateCachedReceipt(label: "Setup", receipt: receipt)
@@ -93,6 +95,7 @@ extension Capitalist {
 		
 		@discardableResult
 		func loadBundleReceipt(completion: CapitalistErrorCallback? = nil) -> Bool {
+			if !shouldValidateWithServer { return false }
 			if let url = Bundle.main.appStoreReceiptURL, let receipt = try? Data(contentsOf: url) {
 				self.isValidating = true
 				self.validate(data: receipt) {

@@ -36,7 +36,7 @@ public class Capitalist: NSObject {
 	private weak var purchaseTimeOutTimer: Timer?
 	private var productsRequest: SKProductsRequest?
 	
-	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false) {
+	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false, validatingReceiptWithServer: Bool = true) {
 		if isSetup {
 			print("Capitalist.setup() should only be called once.")
 			return
@@ -47,7 +47,7 @@ public class Capitalist: NSObject {
 		SKPaymentQueue.default().add(self)
 		Capitalist.Receipt.appSpecificSharedSecret = secret
 		allProductIDs = productIDs
-		receipt = Receipt()
+		receipt = Receipt(validating: validatingReceiptWithServer)
 		requestProducts()
 		if refreshReceipt { checkForPurchases() }
 	}
