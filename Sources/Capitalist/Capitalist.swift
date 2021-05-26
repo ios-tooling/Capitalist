@@ -14,6 +14,7 @@ public protocol CapitalistDelegate: AnyObject {
 
 public class Capitalist: NSObject {
 	public static let instance = Capitalist()
+	private override init() { super.init() }
 	
 	public var purchasedProducts: [Product.ID] = []
 	public var availableProducts: [Product.ID: Product] = [:]

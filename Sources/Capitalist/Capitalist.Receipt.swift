@@ -95,7 +95,10 @@ extension Capitalist {
 		
 		@discardableResult
 		func loadBundleReceipt(completion: CapitalistErrorCallback? = nil) -> Bool {
-			if !shouldValidateWithServer { return false }
+			if !shouldValidateWithServer {
+				completion?(nil)
+				return false
+			}
 			if let url = Bundle.main.appStoreReceiptURL, let receipt = try? Data(contentsOf: url) {
 				self.isValidating = true
 				self.validate(data: receipt) {
