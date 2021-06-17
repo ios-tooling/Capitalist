@@ -51,7 +51,7 @@ extension Capitalist {
 				}
 			}
 		}
-		Capitalist.instance.objectChanged()
+		DispatchQueue.main.async { Capitalist.instance.objectChanged() }
 	}
 	
 	public class Receipt: NSObject {

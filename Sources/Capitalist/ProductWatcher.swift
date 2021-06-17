@@ -7,14 +7,14 @@
 
 import Foundation
 
+#if canImport(UIKit)
+	import UIKit
+	 public typealias CapitalistView = UIView
+#else
 #if canImport(Cocoa)
 	import Cocoa
     public typealias CapitalistView = NSView
 #endif
-
-#if canImport(UIKit)
-	import UIKit
-    public typealias CapitalistView = UIView
 #endif
 
 open class ProductWatcher: NSObject {

@@ -176,7 +176,12 @@ extension Capitalist {
 				return nil
 			}
 		}
-		public var subscriptionExpirationDate: Date? { return self.date(for: "expires_date") ?? onDeviceExpirationDate }
+		public var subscriptionExpirationDate: Date? {
+			guard let onDevice = onDeviceExpirationDate else { return self.date(for: "expires_date") }
+			guard let receipt = self.date(for: "expires_date") else { return onDevice }
+			
+			return max(onDevice, receipt)
+		}
 		public var originalPurchaseDate: Date? { return self.date(for: "original_purchase_date") }
 		public var purchaseDate: Date? { return self.date(for: "purchase_date") }
 		public var hasUsedTrial: Bool { return self.isInTrialPeriod || self.isInIntroOfferPeriod || self.originalPurchaseDate != nil }

@@ -329,7 +329,7 @@ extension Capitalist: SKProductsRequestDelegate {
 		self.purchaseQueue.resume()
 		NotificationCenter.default.post(name: Notifications.didFetchProducts, object: nil)
 		self.delegate?.didFetchProducts()
-		objectChanged()
+		DispatchQueue.main.async { self.objectChanged() }
 	}
 	
 	public func logCurrentProducts(label: String) {
