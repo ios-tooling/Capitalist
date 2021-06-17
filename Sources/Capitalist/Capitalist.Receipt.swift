@@ -8,17 +8,21 @@ import StoreKit
 public typealias CapitalistCallback = () -> Void
 public typealias CapitalistErrorCallback = (Error?) -> Void
 
-extension Capitalist {	
-	public func currentExpirationDate(for productIDs: [Product.ID] = Capitalist.instance.allProductIDs) -> Date? {
-		var newest: Date?
-
+extension Capitalist {
+	public func currentExpirationDateAndProduct(for productIDs: [Product.ID] = Capitalist.instance.allProductIDs) -> (id: Product.ID, date: Date)? {
+		var result: (id: Product.ID, date: Date)?
+		
 		for id in productIDs {
 			guard let product = self.availableProducts[id], let date = product.subscriptionExpirationDate else { continue }
 
-			if newest == nil || newest! < date { newest = date }
+			if result == nil || result!.date < date { result = (id: id, date: date) }
 		}
 
-		return newest
+		return result
+	}
+
+	public func currentExpirationDate(for productIDs: [Product.ID] = Capitalist.instance.allProductIDs) -> Date? {
+		currentExpirationDateAndProduct(for: productIDs)?.date
 	}
 	
 	public func isInTrial(for productIDs: [Product.ID]) -> Bool {
@@ -47,6 +51,7 @@ extension Capitalist {
 				}
 			}
 		}
+		Capitalist.instance.objectChanged()
 	}
 	
 	public class Receipt: NSObject {

@@ -329,6 +329,7 @@ extension Capitalist: SKProductsRequestDelegate {
 		self.purchaseQueue.resume()
 		NotificationCenter.default.post(name: Notifications.didFetchProducts, object: nil)
 		self.delegate?.didFetchProducts()
+		objectChanged()
 	}
 	
 	public func logCurrentProducts(label: String) {
@@ -439,3 +440,22 @@ fileprivate extension Scanner {
 		  }
 	 }
 }
+
+#if canImport(Combine)
+
+	@available(OSX 10.15, iOS 13.0, tvOS 13, watchOS 6, *)
+	extension Capitalist: ObservableObject {
+	}
+
+	extension Capitalist {
+		 func objectChanged() {
+			  if #available(OSX 10.15, iOS 13.0, tvOS 13, watchOS 6, *) {
+					objectWillChange.send()
+			  }
+		 }
+	}
+#else
+extension Capitalist {
+	func objectChanged() { }
+}
+#endif
