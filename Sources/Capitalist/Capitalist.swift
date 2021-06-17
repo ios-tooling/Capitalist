@@ -176,19 +176,21 @@ public class Capitalist: NSObject {
 			default: break
 			}
 		}
+		
 		if product.id.kind == .consumable, let purchasedAt = date {
 			self.recordConsumablePurchase(of: product.id, at: purchasedAt)
 		}
 		
 		let completion = self.purchaseCompletion
+		let purchased = availableProducts[product.id] ?? product
 		self.purchaseCompletion = nil
 		
 		self.receipt.loadBundleReceipt { error in
 			if let err = error { print("Error when loading local receipt: \(err)") }
-			completion?(product, nil)
+			completion?(purchased, nil)
 			self.state = .idle
-			NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: product, userInfo: Notification.purchaseFlagsDict(restored ? .restored : []))
-			self.delegate?.didPurchase(product: product, flags: restored ? .restored : [])
+			NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: purchased, userInfo: Notification.purchaseFlagsDict(restored ? .restored : []))
+			self.delegate?.didPurchase(product: purchased, flags: restored ? .restored : [])
 		}
 	}
 	

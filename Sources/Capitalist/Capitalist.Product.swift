@@ -5,6 +5,8 @@
 import Foundation
 import StoreKit
 
+// https://developer.apple.com/app-store/subscriptions/ 
+
 extension Capitalist {
 	public func purchasePhase(of product: Product.ID) -> ProductPurchsePhase {
 		if product.isPrepurchased { return .prepurchased }
@@ -13,6 +15,24 @@ extension Capitalist {
 		return .idle
 	}
 	
+	public enum SubscriptionDuration { case oneWeek, twoWeeks, threeWeeks, oneMonth, twoMonths, threeMonths, sixMonths, oneYear
+		func expiration(startingAt: Date) -> Date {
+			var components = DateComponents()
+			
+			switch self {
+			case .oneWeek: components.day = 7
+			case .twoWeeks: components.day = 14
+			case .threeWeeks: components.day = 21
+			case .oneMonth: components.month = 1
+			case .twoMonths: components.month = 2
+			case .threeMonths: components.month = 3
+			case .sixMonths: components.month = 6
+			case .oneYear: components.year = 1
+			}
+			
+			return Calendar.current.date(byAdding: components, to: startingAt) ?? startingAt
+		}
+	}
 	public struct Product: CustomStringConvertible, Equatable {
 		public struct ID: Equatable, Hashable, CustomStringConvertible {
 			public enum Kind: String { case none, nonConsumable, consumable, subscription }
@@ -21,15 +41,17 @@ extension Capitalist {
 			public let kind: Kind
 			public var description: String { return self.rawValue }
 			public let isPrepurchased: Bool
+			public let subscriptionDuration: SubscriptionDuration?
 
 			var isValid: Bool { return !self.rawValue.isEmpty }
 			
 			static let none = ID(rawValue: "", kind: .none)
 			
-			public init(rawValue: String, kind: Kind, isPrepurchased: Bool = false) {
+			public init(rawValue: String, kind: Kind, isPrepurchased: Bool = false, subscriptionDuration: SubscriptionDuration? = nil) {
 				self.rawValue = rawValue
 				self.kind = kind
 				self.isPrepurchased = isPrepurchased
+				self.subscriptionDuration = subscriptionDuration
 			}
 		}
 		
@@ -108,12 +130,20 @@ extension Capitalist {
 		var info: [String: Any]?
 		public let id: Capitalist.Product.ID
 		public var product: SKProduct?
-		var recentPurchaseDate: Date?
+		var recentPurchaseDate: Date? { didSet { updateSubscriptionInfo() }}
+		var onDeviceExpirationDate: Date?
+		
 		static let currencyFormatter: NumberFormatter = {
 			let formatter = NumberFormatter()
 			formatter.numberStyle = .currency
 			return formatter
 		}()
+		
+		mutating func updateSubscriptionInfo() {
+			if let date = recentPurchaseDate, let expiration = self.id.subscriptionDuration?.expiration(startingAt: date) {
+				self.onDeviceExpirationDate = expiration
+			}
+		}
 		
 		public var expirationReason: ExpirationReason? {
 			guard let reason = self.info?["expiration_intent"] as? Int else { return nil }
@@ -146,7 +176,7 @@ extension Capitalist {
 				return nil
 			}
 		}
-		public var subscriptionExpirationDate: Date? { return self.date(for: "expires_date") }
+		public var subscriptionExpirationDate: Date? { return self.date(for: "expires_date") ?? onDeviceExpirationDate }
 		public var originalPurchaseDate: Date? { return self.date(for: "original_purchase_date") }
 		public var purchaseDate: Date? { return self.date(for: "purchase_date") }
 		public var hasUsedTrial: Bool { return self.isInTrialPeriod || self.isInIntroOfferPeriod || self.originalPurchaseDate != nil }
