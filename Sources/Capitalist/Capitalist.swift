@@ -21,7 +21,7 @@ public class Capitalist: NSObject {
 	public var waitingPurchases: [Product.ID] = []
 	public var receipt: Receipt!
 	public var cacheDecryptedReceipts = true
-	public var useSandbox = Capitalist.distribution != .appStore
+	public var useSandbox = (Capitalist.distribution != .appStore && Capitalist.distribution != .testflight)
 	public var allProductIDs: [Product.ID] = []
 	public var purchaseTimeOut: TimeInterval = 120
 	public var purchasedConsumables: [ConsumablePurchase] = []

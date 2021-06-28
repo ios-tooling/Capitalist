@@ -61,8 +61,14 @@ extension Capitalist {
 		public var cachedReciept: [String: Any]?
 		var currentCheckingHash: Int?
 		var shouldValidateWithServer = true
+		var serverResponse: String?
 
 		var refreshCompletions: [(Error?) -> Void] = []
+		public override var description: String {
+			if let cached = cachedReciept { return cached.description }
+			if let serverResponse = serverResponse { return serverResponse }
+			return "No Cached Receipt"
+		}
 		
 		init(validating: Bool) {
 			super.init()
@@ -131,7 +137,7 @@ extension Capitalist {
 			}
 			
 			self.currentCheckingHash = hash
-			let dict: [String: Any] = ["receipt-data": receiptData.base64EncodedString(), "password": Receipt.appSpecificSharedSecret ?? "", "exclude-old-transactions": true]
+			let dict: [String: Any] = ["receipt-data": receiptData.base64EncodedString(options: .endLineWithCarriageReturn), "password": Receipt.appSpecificSharedSecret ?? "", "exclude-old-transactions": true]
 			let url = URL(string: "https://\(Capitalist.instance.useSandbox ? "sandbox" : "buy").itunes.apple.com/verifyReceipt")!
 			var request = URLRequest(url: url)
 			request.httpBody = try! JSONSerialization.data(withJSONObject: dict, options: [])
@@ -139,19 +145,22 @@ extension Capitalist {
 			
 			let task = URLSession.shared.dataTask(with: request) { result, response, error in
 				if let err = error { print("Error when validating receipt: \(err)") }
-				if let data = result, let info = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any], let status = info["status"] as? Int {
-					if (status == 21007 || (info["environment"] as? String) == "Sandbox"), !Capitalist.instance.useSandbox { // if the server sends back a 21007, we're in the Sandbox. Happens during AppReview
-						Capitalist.instance.useSandbox = true
-						self.currentCheckingHash = nil
-						self.validate(data: receiptData, completion: completion)
-						return
-					} else if status == 21004 {
-						print("Your secret \(Receipt.appSpecificSharedSecret == nil ? "is missing." : "doesn't seem to be correct.")")
-					} else if status != 0 {
-						print("Bad status (\(status)) returned from the AppStore.")
-					} else {
-						self.lastValidReceiptData = data
-						self.updateCachedReceipt(label: "Post Validation", receipt: info)
+				if let data = result {
+					self.serverResponse = String(data: data, encoding: .utf8)
+					if let info = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any], let status = info["status"] as? Int {
+						if (status == 21007 || (info["environment"] as? String) == "Sandbox"), !Capitalist.instance.useSandbox { // if the server sends back a 21007, we're in the Sandbox. Happens during AppReview
+							Capitalist.instance.useSandbox = true
+							self.currentCheckingHash = nil
+							self.validate(data: receiptData, completion: completion)
+							return
+						} else if status == 21004 {
+							print("Your secret \(Receipt.appSpecificSharedSecret == nil ? "is missing." : "doesn't seem to be correct.")")
+						} else if status != 0 {
+							print("Bad status (\(status)) returned from the AppStore.")
+						} else {
+							self.lastValidReceiptData = data
+							self.updateCachedReceipt(label: "Post Validation", receipt: info)
+						}
 					}
 				}
 				DispatchQueue.main.async { self.callValidationCompletions() }
