@@ -27,6 +27,7 @@ public class Capitalist: NSObject {
 	public var purchasedConsumables: [ConsumablePurchase] = []
 	public var loggingOn = false
 	public var subscriptionManagementURL = URL(string: "https://finance-app.itunes.apple.com/account/subscriptions")!
+	public var productFetchError: Error?
 	
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
 	
@@ -287,6 +288,7 @@ extension Capitalist: SKRequestDelegate {
 			print("We shouldn't hit an error when we're idle.")
 			
 		case .fetchingProducts:
+			self.productFetchError = error
 			print("Failed to fetch products: \(error)")
 			self.purchaseQueue.resume()
 			
