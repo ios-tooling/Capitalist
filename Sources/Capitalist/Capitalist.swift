@@ -396,11 +396,11 @@ extension Capitalist {
 				let bundlePath = Bundle.main.bundleURL
 				let receiptURL = bundlePath.appendingPathComponent("Contents").appendingPathComponent("_MASReceipt").appendingPathComponent("receipt")
 				
-				return FileManager.default.fileExists(at: receiptURL) ? .appStore : .development
-			#endif
-			#if targetEnvironment(simulator)
-				return .development
+				return FileManager.default.fileExists(atPath: receiptURL.path) ? .appStore : .development
 			#else
+				#if targetEnvironment(simulator)
+					return .development
+				#endif
 				if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" && MobileProvisionFile.default?.properties["ProvisionedDevices"] == nil { return .testflight }
 			
 				return .appStore
