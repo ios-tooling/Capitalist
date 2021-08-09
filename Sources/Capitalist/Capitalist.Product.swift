@@ -168,7 +168,7 @@ extension Capitalist {
 			return recentPurchase.addingTimeInterval(duration)
 		}
 		public var subscriptionDuration: TimeInterval? {
-			if #available(iOS 11.2, *) {
+			if #available(iOS 11.2, macOS 10.13.2, *) {
 				guard id.kind == .subscription, let period = product?.subscriptionPeriod else { return nil }
 
 				return TimeInterval(period.numberOfUnits) * period.unit.timeInterval
@@ -322,7 +322,7 @@ extension Dictionary where Key == String {
 	}
 }
 
-@available(iOS 11.2, *)
+@available(iOS 11.2, macOS 10.13.2, *)
 extension SKProduct.PeriodUnit {
 	var timeInterval: TimeInterval {
 		switch self {
