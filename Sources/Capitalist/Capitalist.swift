@@ -34,6 +34,7 @@ public class Capitalist: NSObject {
 	private weak var delegate: CapitalistDelegate?
 	private var isSetup = false
 	private var purchaseQueue = DispatchQueue(label: "purchasing")
+	internal let processingQueue = DispatchQueue(label: "capitalistProcessingQueue")
 	private var purchaseCompletion: ((Product?, Error?) -> Void)?
 	private weak var purchaseTimeOutTimer: Timer?
 	private var productsRequest: SKProductsRequest?

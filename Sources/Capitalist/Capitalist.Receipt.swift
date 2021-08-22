@@ -144,26 +144,28 @@ extension Capitalist {
 			request.httpMethod = "POST"
 			
 			let task = URLSession.shared.dataTask(with: request) { result, response, error in
-				if let err = error { print("Error when validating receipt: \(err)") }
-				if let data = result {
-					self.serverResponse = String(data: data, encoding: .utf8)
-					if let info = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any], let status = info["status"] as? Int {
-						if (status == 21007 || (info["environment"] as? String) == "Sandbox"), !Capitalist.instance.useSandbox { // if the server sends back a 21007, we're in the Sandbox. Happens during AppReview
-							Capitalist.instance.useSandbox = true
-							self.currentCheckingHash = nil
-							self.validate(data: receiptData, completion: completion)
-							return
-						} else if status == 21004 {
-							print("Your secret \(Receipt.appSpecificSharedSecret == nil ? "is missing." : "doesn't seem to be correct.")")
-						} else if status != 0 {
-							print("Bad status (\(status)) returned from the AppStore.")
-						} else {
-							self.lastValidReceiptData = data
-							self.updateCachedReceipt(label: "Post Validation", receipt: info)
+				Capitalist.instance.processingQueue.async {
+					if let err = error { print("Error when validating receipt: \(err)") }
+					if let data = result {
+						self.serverResponse = String(data: data, encoding: .utf8)
+						if let info = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any], let status = info["status"] as? Int {
+							if (status == 21007 || (info["environment"] as? String) == "Sandbox"), !Capitalist.instance.useSandbox { // if the server sends back a 21007, we're in the Sandbox. Happens during AppReview
+								Capitalist.instance.useSandbox = true
+								self.currentCheckingHash = nil
+								self.validate(data: receiptData, completion: completion)
+								return
+							} else if status == 21004 {
+								print("Your secret \(Receipt.appSpecificSharedSecret == nil ? "is missing." : "doesn't seem to be correct.")")
+							} else if status != 0 {
+								print("Bad status (\(status)) returned from the AppStore.")
+							} else {
+								self.lastValidReceiptData = data
+								self.updateCachedReceipt(label: "Post Validation", receipt: info)
+							}
 						}
 					}
+					DispatchQueue.main.async { self.callValidationCompletions() }
 				}
-				DispatchQueue.main.async { self.callValidationCompletions() }
 			}
 			
 			task.resume()
