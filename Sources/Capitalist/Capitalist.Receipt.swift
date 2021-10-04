@@ -33,7 +33,7 @@ extension Capitalist {
 		return self.availableProducts.values.filter({ productIDs.contains($0.id) && $0.hasUsedTrial }).count > 0
 	}
 	
-	private func load(receipts: [[String: Any]]) {
+	private func load(receipts: [[String: Any]], latest: [String: Any]?) {
 		self.purchasedConsumables = []
 		for receipt in receipts {
 			guard
@@ -98,10 +98,28 @@ extension Capitalist {
 		
 		func updateCachedReceipt(label: String, receipt: [String: Any]? = nil) {
 			if receipt != nil { cachedReciept = receipt }
-			if let recp = self.cachedReciept?["receipt"] as? [String: Any], let inApp = recp["in_app"] as? [[String: Any]] { Capitalist.instance.load(receipts: inApp) }
-			if let info = self.cachedReciept?["latest_receipt_info"] as? [[String: Any]] { Capitalist.instance.load(receipts: info) }
-			
+			if let actual = receipt ?? cachedReciept {
+				let latest = (actual["latest_receipt_info"] as? [[String: Any]])?.first
+				let all = actual["receipt"] as? [String: Any]
+				if let inApp = all?["in_app"] as? [[String: Any]] { Capitalist.instance.load(receipts: inApp, latest: latest) }
+				if let info = latest { Capitalist.instance.load(receipts: [info], latest: info) }
+			}
 			if Capitalist.instance.loggingOn { Capitalist.instance.logCurrentProducts(label: label) }
+		}
+		
+		var receiptData: Data? {
+			guard var url = Bundle.main.appStoreReceiptURL else { return nil }
+			
+			if let override = Capitalist.instance.receiptOverride {
+				url = url.deletingLastPathComponent().appendingPathComponent(override.receiptName)
+			}
+			if let data = try? Data(contentsOf: url) { return data }
+			if url.lastPathComponent == "receipt" {
+				url = url.deletingLastPathComponent().appendingPathComponent("sandboxReceipt")
+			} else {
+				url = url.deletingLastPathComponent().appendingPathComponent("receipt")
+			}
+			return try? Data(contentsOf: url)
 		}
 		
 		@discardableResult
@@ -110,7 +128,7 @@ extension Capitalist {
 				completion?(nil)
 				return false
 			}
-			if let url = Bundle.main.appStoreReceiptURL, let receipt = try? Data(contentsOf: url) {
+			if let receipt = receiptData {
 				self.isValidating = true
 				self.validate(data: receipt) {
 					self.isValidating = false
@@ -151,6 +169,11 @@ extension Capitalist {
 						if let info = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any], let status = info["status"] as? Int {
 							if (status == 21007 || (info["environment"] as? String) == "Sandbox"), !Capitalist.instance.useSandbox { // if the server sends back a 21007, we're in the Sandbox. Happens during AppReview
 								Capitalist.instance.useSandbox = true
+								self.currentCheckingHash = nil
+								self.validate(data: receiptData, completion: completion)
+								return
+							} else if status == 21008 {
+								Capitalist.instance.useSandbox = false
 								self.currentCheckingHash = nil
 								self.validate(data: receiptData, completion: completion)
 								return

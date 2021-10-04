@@ -28,6 +28,7 @@ public class Capitalist: NSObject {
 	public var loggingOn = false
 	public var subscriptionManagementURL = URL(string: "https://finance-app.itunes.apple.com/account/subscriptions")!
 	public var productFetchError: Error?
+	public var receiptOverride: ReceiptOverride?
 	
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
 	
@@ -388,7 +389,15 @@ extension Error {
 
 extension Capitalist {
 	public enum Distribution { case development, testflight, appStore }
-	
+	public enum ReceiptOverride { case production, sandbox
+		var receiptName: String {
+			switch self {
+			case .production: return "receipt"
+			case .sandbox: return "sandboxReceipt"
+			}
+		}
+	}
+
 	public static var distribution: Distribution {
 		#if DEBUG
 			return .development
