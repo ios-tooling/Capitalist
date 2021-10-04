@@ -28,6 +28,7 @@ public class Capitalist: NSObject {
 	public var loggingOn = false
 	public var subscriptionManagementURL = URL(string: "https://finance-app.itunes.apple.com/account/subscriptions")!
 	public var productFetchError: Error?
+	public var reportedError: Error? { didSet { self.objectChanged() }}
 	public var receiptOverride: ReceiptOverride?
 	
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
@@ -285,6 +286,8 @@ extension Capitalist: SKRequestDelegate {
 	}
 	
 	public func request(_ request: SKRequest, didFailWithError error: Error) {
+		self.reportedError = error
+		
 		switch self.state {
 		case .idle:
 			print("We shouldn't hit an error when we're idle.")
