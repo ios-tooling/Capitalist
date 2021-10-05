@@ -121,8 +121,8 @@ extension Capitalist {
 		}
 		
 		func isOlderThan(receipt: [String: Any]) -> Bool {
-			guard let receiptPurchaseDate = receipt.purchaseDate else { return false }
-			guard let purchaseDate = self.date(for: "purchase_date") else { return true }
+			guard let receiptPurchaseDate = receipt.expirationDate else { return false }
+			guard let purchaseDate = self.date(for: "expires_date") else { return true }
 			
 			return receiptPurchaseDate > purchaseDate
 		}
@@ -317,6 +317,12 @@ extension String {
 extension Dictionary where Key == String {
 	var purchaseDate: Date? {
 		guard let newString = self["purchase_date"] as? String, let newDate = newString.toCapitalistDate() else { return nil }
+		
+		return newDate
+	}
+
+	var expirationDate: Date? {
+		guard let newString = self["expires_date"] as? String, let newDate = newString.toCapitalistDate() else { return nil }
 		
 		return newDate
 	}
