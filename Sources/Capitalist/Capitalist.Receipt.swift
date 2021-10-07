@@ -9,13 +9,21 @@ public typealias CapitalistCallback = () -> Void
 public typealias CapitalistErrorCallback = (Error?) -> Void
 
 extension Capitalist {
-	public func currentExpirationDateAndProduct(for productIDs: [Product.ID] = Capitalist.instance.allProductIDs) -> (id: Product.ID, date: Date)? {
-		var result: (id: Product.ID, date: Date)?
+	public struct ProductExpiration: CustomStringConvertible {
+		public let id: Product.ID
+		public let date: Date
+		
+		public var description: String {
+			"\(id): \(date.description)"
+		}
+	}
+	public func currentExpirationDateAndProduct(for productIDs: [Product.ID] = Capitalist.instance.allProductIDs) -> ProductExpiration? {
+		var result: ProductExpiration?
 		
 		for id in productIDs {
 			guard let product = self.availableProducts[id], let date = product.subscriptionExpirationDate else { continue }
 
-			if result == nil || result!.date < date { result = (id: id, date: date) }
+			if result == nil || result!.date < date { result = ProductExpiration(id: id, date: date) }
 		}
 
 		return result

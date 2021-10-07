@@ -41,12 +41,13 @@ public class Capitalist: NSObject {
 	private weak var purchaseTimeOutTimer: Timer?
 	private var productsRequest: SKProductsRequest?
 	
-	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false, validatingReceiptWithServer: Bool = true) {
+	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false, validatingReceiptWithServer: Bool = true, receiptOverride: ReceiptOverride? = nil) {
 		if isSetup {
 			print("Capitalist.setup() should only be called once.")
 			return
 		}
 		
+		if let over = receiptOverride { self.receiptOverride = over }
 		isSetup = true
 		self.delegate = delegate
 		SKPaymentQueue.default().add(self)
