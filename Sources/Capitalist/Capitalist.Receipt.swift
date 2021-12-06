@@ -43,7 +43,6 @@ extension Capitalist {
 	
 	private func load(receipts: [[String: Any]], latest: [String: Any]?) {
 		self.purchasedConsumables = []
-		self.receipt.hasSales = receipts.count > 0
 		for receipt in receipts {
 			guard
 				let id = self.productID(from: receipt["product_id"] as? String ?? ""),
@@ -60,6 +59,7 @@ extension Capitalist {
 				}
 			}
 		}
+		self.hasSales = receipts.count > 0
 		DispatchQueue.main.async { Capitalist.instance.objectChanged() }
 	}
 	
@@ -71,7 +71,6 @@ extension Capitalist {
 		var currentCheckingHash: Int?
 		var shouldValidateWithServer = true
 		var serverResponse: String?
-		public var hasSales = false
 
 		var refreshCompletions: [(Error?) -> Void] = []
 		public override var description: String {

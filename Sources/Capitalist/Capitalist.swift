@@ -30,7 +30,8 @@ public class Capitalist: NSObject {
 	public var productFetchError: Error?
 	public var reportedError: Error? { didSet { self.objectChanged() }}
 	public var receiptOverride: ReceiptOverride?
-	
+	public var hasSales = false
+
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
 	
 	private weak var delegate: CapitalistDelegate?
