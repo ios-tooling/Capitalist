@@ -188,11 +188,14 @@ extension Capitalist {
 								return
 							} else if status == 21004 {
 								print("Your secret \(Receipt.appSpecificSharedSecret == nil ? "is missing." : "doesn't seem to be correct.")")
+								self.callValidationCompletions()
 							} else if status != 0 {
 								print("Bad status (\(status)) returned from the AppStore.")
+								self.callValidationCompletions()
 							} else {
 								self.lastValidReceiptData = data
 								self.updateCachedReceipt(label: "Post Validation", receipt: info)
+								self.callValidationCompletions()
 							}
 						}
 					}
