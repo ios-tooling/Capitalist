@@ -40,7 +40,7 @@ public class Capitalist: NSObject {
 	internal let processingQueue = DispatchQueue(label: "capitalistProcessingQueue")
 	private var purchaseCompletion: ((Product?, Error?) -> Void)?
 	private weak var purchaseTimeOutTimer: Timer?
-	private var productsRequest: SKProductsRequest?
+	private var productsRequest: ProductFetcher?
 	
 	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false, validatingReceiptWithServer: Bool = true, receiptOverride: ReceiptOverride? = nil) {
 		if isSetup {
@@ -126,12 +126,13 @@ public class Capitalist: NSObject {
 		case .nonConsumable: return !self.hasPurchased(id)
 		case .subscription: return self.currentExpirationDate(for: [id]) == nil
 		case .none: return false
+		case .notSet: return false
 		}
 	}
 	
 	@discardableResult
 	public func purchase(_ id: Product.ID, completion: ((Product?, Error?) -> Void)? = nil) -> Bool {
-		guard let product = self.product(for: id), let skProduct = product.product else {
+		guard let product = self.product(for: id) else {
 			completion?(nil, CapitalistError.productNotFound)
 			
 			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: id, userInfo: ["error": CapitalistError.productNotFound])
@@ -139,6 +140,19 @@ public class Capitalist: NSObject {
 			return false
 		}
 		
+		return purchase(product, completion: completion)
+	}
+	
+	@discardableResult
+	public func purchase(_ product: Product, completion: ((Product?, Error?) -> Void)? = nil) -> Bool {
+		guard let skProduct = product.product else {
+			completion?(nil, CapitalistError.productNotFound)
+			
+			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: product.id, userInfo: ["error": CapitalistError.productNotFound])
+			
+			return false
+		}
+
 		guard self.state == .idle else {
 			completion?(product, CapitalistError.purchaseAlreadyInProgress)
 			return false
@@ -294,10 +308,7 @@ extension Capitalist: SKRequestDelegate {
 		case .idle:
 			print("We shouldn't hit an error when we're idle.")
 			
-		case .fetchingProducts:
-			self.productFetchError = error
-			print("Failed to fetch products: \(error)")
-			self.purchaseQueue.resume()
+		case .fetchingProducts: break
 			
 		case .purchasing(let product):
 			print("Failed to purchase \(product): \(error)")
@@ -310,35 +321,41 @@ extension Capitalist: SKRequestDelegate {
 		self.state = .idle
 		print("Error from \(request): \(error)")
 	}
+	
+	func load(products: [SKProduct]) {
+		products.forEach {
+			if let prod = self.productID(from: $0.productIdentifier) {
+				self.availableProducts[prod] = Product(product: $0)
+			}
+		}
+	}
 }
 
-extension Capitalist: SKProductsRequestDelegate {
+extension Capitalist {
 	func requestProducts(productIDs: [Product.ID]? = nil ) {
 		if self.state != .idle { return }
 		
 		self.state = .fetchingProducts
 		self.purchaseQueue.suspend()
 		let products = productIDs ?? self.allProductIDs
-		self.productsRequest = SKProductsRequest(productIdentifiers: Set(products.map({ $0.rawValue })))
-		productsRequest?.delegate = self
-		productsRequest?.start()
-	}
-	
-	public func productsRequest(_ request: SKProductsRequest, didReceive response: SKProductsResponse) {
-		self.availableProducts = [:]
-		response.products.forEach {
-			if let prod = self.productID(from: $0.productIdentifier) {
-				self.availableProducts[prod] = Product(product: $0)
+		
+		productsRequest = ProductFetcher(ids: products) { result in
+			switch result {
+			case .failure(let err):
+				self.productFetchError = err
+				print("Failed to fetch products: \(err)")
+				
+			case .success:
+				self.state = .idle
+				
+				self.receipt.updateCachedReceipt(label: "Product Request Completed")
+				NotificationCenter.default.post(name: Notifications.didFetchProducts, object: nil)
+				self.delegate?.didFetchProducts()
+				DispatchQueue.main.async { self.objectChanged() }
 			}
+			self.productsRequest = nil
 		}
-		
-		self.state = .idle
-		
-		self.receipt.updateCachedReceipt(label: "Product Request Completed")
-		self.purchaseQueue.resume()
-		NotificationCenter.default.post(name: Notifications.didFetchProducts, object: nil)
-		self.delegate?.didFetchProducts()
-		DispatchQueue.main.async { self.objectChanged() }
+		DispatchQueue.main.async { self.purchaseQueue.resume() }
 	}
 	
 	public func logCurrentProducts(label: String) {
@@ -352,6 +369,7 @@ extension Capitalist: SKProductsRequestDelegate {
 			case .consumable: text += "\(product)\n"
 			case .nonConsumable: text += "\(product)\n"
 			case .none: text += "Bad product: \(product)\n"
+			case .notSet: text += "Not set: \(product)"
 			}
 		}
 		

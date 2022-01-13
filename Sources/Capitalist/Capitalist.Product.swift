@@ -35,7 +35,7 @@ extension Capitalist {
 	}
 	public struct Product: CustomStringConvertible, Equatable {
 		public struct ID: Equatable, Hashable, CustomStringConvertible {
-			public enum Kind: String { case none, nonConsumable, consumable, subscription }
+			public enum Kind: String { case none, nonConsumable, consumable, subscription, notSet }
 			
 			public let rawValue: String
 			public let kind: Kind
@@ -201,6 +201,7 @@ extension Capitalist {
 			case .nonConsumable: return self.quantity > 0
 			case .consumable: return false
 			case .subscription: return self.subscriptionExpirationDate != nil
+			case .notSet: return false
 			}
 		}
 		
