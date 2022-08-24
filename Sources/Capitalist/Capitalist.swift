@@ -42,6 +42,8 @@ public class Capitalist: NSObject {
 	private weak var purchaseTimeOutTimer: Timer?
 	private var productsRequest: ProductFetcher?
 	
+	public var currentReceiptData: Data? { receipt.receiptData }
+	
 	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false, validatingReceiptWithServer: Bool = true, receiptOverride: ReceiptOverride? = nil) {
 		if isSetup {
 			print("Capitalist.setup() should only be called once.")
