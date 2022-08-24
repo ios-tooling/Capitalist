@@ -117,6 +117,8 @@ public class Capitalist: NSObject {
 		return self.availableProducts[id]
 	}
 	
+	public func isProductAvailable(_ id: Product.ID) -> Bool { product(for: id) != nil }
+	
 	public func canPurchase(_ id: Product.ID) -> Bool {
 		if self.state != .idle, self.state != .restoring { return false }
 		guard !id.isPrepurchased, let product = self.product(for: id), product.product != nil else { return false }
