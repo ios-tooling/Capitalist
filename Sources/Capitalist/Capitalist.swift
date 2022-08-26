@@ -10,6 +10,7 @@ import StoreKit
 public protocol CapitalistDelegate: AnyObject {
 	func didFetchProducts()
 	func didPurchase(product: Capitalist.Product, flags: Capitalist.PurchaseFlag)
+	func didFailToPurchase(productID: Capitalist.Product.ID, error: Error)
 }
 
 public class Capitalist: NSObject {
@@ -140,7 +141,7 @@ public class Capitalist: NSObject {
 			completion?(nil, CapitalistError.productNotFound)
 			
 			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: id, userInfo: ["error": CapitalistError.productNotFound])
-			
+			delegate?.didFailToPurchase(productID: id, error: CapitalistError.productNotFound)
 			return false
 		}
 		
@@ -153,7 +154,8 @@ public class Capitalist: NSObject {
 			completion?(nil, CapitalistError.productNotFound)
 			
 			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: product.id, userInfo: ["error": CapitalistError.productNotFound])
-			
+			delegate?.didFailToPurchase(productID: product.id, error: CapitalistError.productNotFound)
+
 			return false
 		}
 
@@ -293,7 +295,13 @@ extension Capitalist: SKPaymentTransactionObserver {
 			var userInfo: [String: Any]? = error != nil ? ["error": error!] : nil
 			if let err = error as? SKError, err.code == .paymentCancelled || err.code == .paymentNotAllowed { userInfo = nil }
 			self.state = .idle
-			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: prod, userInfo: userInfo)
+			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: prod.id, userInfo: userInfo)
+			
+			if (error as? SKError)?.code == .paymentCancelled {
+				delegate?.didFailToPurchase(productID: prod.id, error: CapitalistError.cancelled)
+			} else {
+				delegate?.didFailToPurchase(productID: prod.id, error: error ?? CapitalistError.unknownStoreKitError)
+			}
 		}
 		
 		completion?(product, error)

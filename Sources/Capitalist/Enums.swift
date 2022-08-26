@@ -24,7 +24,7 @@ extension Capitalist {
 	}
 	
 	public enum CapitalistError: String, Error, LocalizedError, CustomStringConvertible {
-		case productNotFound, purchaseAlreadyInProgress, requestTimedOut
+		case productNotFound, cancelled, purchaseAlreadyInProgress, requestTimedOut, unknownStoreKitError
 		public var localizedDescription: String { return self.rawValue }
 		public var description: String { return self.rawValue }
 	}
