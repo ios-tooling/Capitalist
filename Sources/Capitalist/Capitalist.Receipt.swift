@@ -71,6 +71,8 @@ extension Capitalist {
 		var currentCheckingHash: Int?
 		var shouldValidateWithServer = true
 		var serverResponse: String?
+		public var receiptDecodeFailed = false
+		public var hasCheckedReceipt = false
 
 		var refreshCompletions: [(Error?) -> Void] = []
 		public override var description: String {
@@ -148,6 +150,7 @@ extension Capitalist {
 				}
 				return true
 			}
+			hasCheckedReceipt = true
 			if Capitalist.instance.loggingOn { print("No local receipt found") }
 			return false
 		}
@@ -170,6 +173,7 @@ extension Capitalist {
 			request.httpBody = try! JSONSerialization.data(withJSONObject: dict, options: [])
 			request.httpMethod = "POST"
 			request.addValue("application/json", forHTTPHeaderField: "Content-type")
+			receiptDecodeFailed = false
 			
 			let task = URLSession.shared.dataTask(with: request) { result, response, error in
 				Capitalist.instance.processingQueue.async {
@@ -190,6 +194,8 @@ extension Capitalist {
 							} else if status == 21004 {
 								print("Your secret \(Receipt.appSpecificSharedSecret == nil ? "is missing." : "doesn't seem to be correct.")")
 								self.callValidationCompletions()
+							} else if status == 21012 || status == 21002 || status == 21003 || status == 21005 {
+								self.receiptDecodeFailed = true
 							} else if status != 0 {
 								print("Bad status (\(status)) returned from the AppStore.")
 								self.callValidationCompletions()
@@ -208,11 +214,13 @@ extension Capitalist {
 		}
 		
 		func callValidationCompletions() {
+			hasCheckedReceipt = true
 			callRefreshCompletions(with: nil)
 			let completions = self.validationCompletions
 			self.currentCheckingHash = nil
 			self.validationCompletions = []
 			completions.forEach { $0() }
+			(Capitalist.instance.delegate as? CapitalistReceiptDelegate)?.didDecodeReceipt()
 		}
 		
 		var lastValidReceiptDataURL: URL {

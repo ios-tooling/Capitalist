@@ -13,6 +13,10 @@ public protocol CapitalistDelegate: AnyObject {
 	func didFailToPurchase(productID: Capitalist.Product.ID, error: Error)
 }
 
+public protocol CapitalistReceiptDelegate: AnyObject {
+	func didDecodeReceipt()
+}
+
 public class Capitalist: NSObject {
 	public static let instance = Capitalist()
 	private override init() { super.init() }
@@ -35,7 +39,7 @@ public class Capitalist: NSObject {
 
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
 	
-	private weak var delegate: CapitalistDelegate?
+	weak var delegate: CapitalistDelegate?
 	private var isSetup = false
 	private var purchaseQueue = DispatchQueue(label: "purchasing")
 	internal let processingQueue = DispatchQueue(label: "capitalistProcessingQueue")
