@@ -10,6 +10,7 @@
 import SwiftUI
 import Combine
 
+#if os(iOS)
 #if canImport(Suite)
 	import Suite
 #endif
@@ -55,5 +56,6 @@ struct ReceiptView_Previews: PreviewProvider {
 	}
 }
 
+#endif
 #endif
 #endif
