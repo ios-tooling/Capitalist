@@ -66,6 +66,13 @@ public class Capitalist: NSObject {
 		if refreshReceipt { checkForPurchases() }
 	}
 	
+	public func update(productIDs: [Product.ID]) {
+		if Set(productIDs) == Set(allProductIDs) { return }
+		
+		allProductIDs = productIDs
+		requestProducts()
+	}
+	
 	public func checkForPurchases() {
 		self.receipt.refresh()
 	}
