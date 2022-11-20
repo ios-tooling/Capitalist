@@ -46,6 +46,7 @@ public class Capitalist: NSObject {
 	private var purchaseCompletion: ((Product?, Error?) -> Void)?
 	private weak var purchaseTimeOutTimer: Timer?
 	private var productsRequest: ProductFetcher?
+	private var pendingProducts: [Product.ID]?
 	
 	public var currentReceiptData: Data? { receipt.receiptData }
 	
@@ -69,8 +70,7 @@ public class Capitalist: NSObject {
 	public func update(productIDs: [Product.ID]) {
 		if Set(productIDs) == Set(allProductIDs) { return }
 		
-		allProductIDs = productIDs
-		requestProducts()
+		requestProducts(productIDs: productIDs)
 	}
 	
 	public func checkForPurchases() {
@@ -361,12 +361,18 @@ extension Capitalist: SKRequestDelegate {
 }
 
 extension Capitalist {
-	func requestProducts(productIDs: [Product.ID]? = nil ) {
-		if self.state != .idle { return }
+	func requestProducts(productIDs: [Product.ID]? = nil) {
+		if self.state != .idle {
+			if let ids = productIDs, Set(ids) != Set(allProductIDs) {
+				pendingProducts = ids
+			}
+			return
+		}
 		
 		self.state = .fetchingProducts
 		self.purchaseQueue.suspend()
 		let products = productIDs ?? self.allProductIDs
+		allProductIDs = products
 		
 		productsRequest = ProductFetcher(ids: products) { result in
 			switch result {
@@ -383,6 +389,10 @@ extension Capitalist {
 				DispatchQueue.main.async { self.objectChanged() }
 			}
 			self.productsRequest = nil
+			if let next = self.pendingProducts {
+				self.pendingProducts = nil
+				self.requestProducts(productIDs: next)
+			}
 		}
 		DispatchQueue.main.async { self.purchaseQueue.resume() }
 	}
