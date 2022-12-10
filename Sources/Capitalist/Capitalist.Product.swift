@@ -329,6 +329,16 @@ extension Dictionary where Key == String {
 	}
 }
 
+extension SKProductSubscriptionPeriod {
+	func expiration(startingAt: Date) -> Date {
+		return startingAt.addingTimeInterval(duration)
+	}
+	
+	var duration: TimeInterval {
+		unit.timeInterval * TimeInterval(numberOfUnits)
+	}
+}
+
 @available(iOS 11.2, macOS 10.13.2, *)
 extension SKProduct.PeriodUnit {
 	var timeInterval: TimeInterval {

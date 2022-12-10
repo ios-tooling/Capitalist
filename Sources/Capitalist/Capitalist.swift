@@ -174,7 +174,13 @@ public class Capitalist: NSObject {
 			completion?(purchased, nil)
 			self.state = .idle
 			NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: purchased, userInfo: Notification.purchaseFlagsDict(restored ? .restored : []))
+			if self.receipt.receiptDecodeFailed {
+				self.saveLocalExpirationDate(for: purchased)
+			} else {
+				self.clearLocalExpirationDate(for: purchased)
+			}
 			self.delegate?.didPurchase(product: purchased, flags: restored ? .restored : [])
+			self.objectChanged()
 		}
 	}
 	
@@ -188,280 +194,6 @@ public class Capitalist: NSObject {
 	}
 }
 
-extension Capitalist: SKPaymentTransactionObserver {
-	public func clearOpenTransactions() {
-		let queue = SKPaymentQueue.default()
-		let transactions = queue.transactions
-		if transactions.isEmpty { return }
-		
-		print("There were \(transactions.count) pending transactions waiting to be cleared:")
-		transactions.forEach {
-			print($0.detailedDescription)
-			queue.finishTransaction($0)
-		}
-	}
-	
-	public func paymentQueue(_ queue: SKPaymentQueue, updatedTransactions transactions: [SKPaymentTransaction]) {
-		for transaction in transactions {
-			switch transaction.transactionState {
-			case .purchased, .restored:
-				if let product = self.product(from: self.productID(from: transaction.payment.productIdentifier)) {
-					self.recordPurchase(of: product, at: transaction.transactionDate, restored: transaction.transactionState == .restored)
-				} else {
-					if let newProduct = Capitalist.Product(product: nil, id: Product.ID(rawValue: transaction.payment.productIdentifier, kind: .notSet)) {
-						self.availableProducts[newProduct.id] = newProduct
-						self.allProductIDs.append(newProduct.id)
-						self.recordPurchase(of: newProduct, at: transaction.transactionDate, restored: transaction.transactionState == .restored)
-					}
-				}
-				SKPaymentQueue.default().finishTransaction(transaction)
-
-			case .purchasing: print("Started purchase flow for \(transaction.payment.productIdentifier)")
-			case .deferred: print("Purchased deferred for \(transaction.payment.productIdentifier)")
-			case .failed:
-				self.failPurchase(of: self.product(from: self.productID(from: transaction.payment.productIdentifier)), dueTo: transaction.error)
-				SKPaymentQueue.default().finishTransaction(transaction)
-				
-				
-			@unknown default:
-				self.failPurchase(of: self.product(from: self.productID(from: transaction.payment.productIdentifier)), dueTo: transaction.error)
-				SKPaymentQueue.default().finishTransaction(transaction)
-			}
-		}
-	}
-	
-	public func paymentQueue(_ queue: SKPaymentQueue, shouldAddStorePayment payment: SKPayment, for product: SKProduct) -> Bool {
-		true
-	}
-	
-	
-	
-	func failPurchase(of product: Product?, dueTo error: Error?) {
-		guard let prod = product else {
-			self.purchaseCompletion = nil
-			return
-		}
-		
-		let completion = self.purchaseCompletion
-		if let index = waitingPurchases.firstIndex(of: prod.id) {
-			waitingPurchases.remove(at: index)
-		}
-		
-		self.purchaseCompletion = nil
-		
-		if self.state == .purchasing(prod) {
-			var userInfo: [String: Any]? = error != nil ? ["error": error!] : nil
-			if let err = error as? SKError, err.code == .paymentCancelled || err.code == .paymentNotAllowed { userInfo = nil }
-			self.state = .idle
-			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: prod.id, userInfo: userInfo)
-			
-			if (error as? SKError)?.code == .paymentCancelled {
-				delegate?.didFailToPurchase(productID: prod.id, error: CapitalistError.cancelled)
-			} else {
-				delegate?.didFailToPurchase(productID: prod.id, error: error ?? CapitalistError.unknownStoreKitError)
-			}
-		}
-		
-		completion?(product, error)
-		print("Failed to purchase \(prod), \(error?.localizedDescription ?? "no error description").")
-	}
-}
-
-extension Capitalist: SKRequestDelegate {
-	public func requestDidFinish(_ request: SKRequest) {
-		switch self.state {
-		case .restoring:
-			self.state = .idle
-			
-		default: break
-		}
-	}
-	
-	public func request(_ request: SKRequest, didFailWithError error: Error) {
-		self.reportedError = error
-		
-		switch self.state {
-		case .idle:
-			print("We shouldn't hit an error when we're idle.")
-			
-		case .fetchingProducts: break
-			
-		case .purchasing(let product):
-			print("Failed to purchase \(product): \(error)")
-			self.failPurchase(of: product, dueTo: error)
-			
-		case .restoring:
-			print("Restore failed: \(error)")
-		}
-		
-		self.state = .idle
-		print("Error from \(request): \(error)")
-	}
-	
-	func load(products: [SKProduct]) {
-		products.forEach {
-			if let prod = self.productID(from: $0.productIdentifier) {
-				self.availableProducts[prod] = Product(product: $0)
-			}
-		}
-	}
-}
-
-extension Capitalist {
-	func requestProducts(productIDs: [Product.ID]? = nil) {
-		if self.state != .idle {
-			if let ids = productIDs, Set(ids) != Set(allProductIDs) {
-				pendingProducts = ids
-			}
-			return
-		}
-		
-		self.state = .fetchingProducts
-		self.purchaseQueue.suspend()
-		let products = productIDs ?? self.allProductIDs
-		allProductIDs = products
-		
-		productsRequest = ProductFetcher(ids: products) { result in
-			switch result {
-			case .failure(let err):
-				self.productFetchError = err
-				print("Failed to fetch products: \(err)")
-				
-			case .success:
-				self.state = .idle
-				
-				self.receipt.updateCachedReceipt(label: "Product Request Completed")
-				NotificationCenter.default.post(name: Notifications.didFetchProducts, object: nil)
-				self.delegate?.didFetchProducts()
-				DispatchQueue.main.async { self.objectChanged() }
-			}
-			self.productsRequest = nil
-			if let next = self.pendingProducts {
-				self.pendingProducts = nil
-				self.requestProducts(productIDs: next)
-			}
-		}
-		DispatchQueue.main.async { self.purchaseQueue.resume() }
-	}
-	
-	public func logCurrentProducts(label: String) {
-		var text = label + "\n"
-		
-		for id in purchasedProducts {
-			guard let product = self.product(for: id) else { continue }
-			
-			switch id.kind {
-			case .subscription: text += "\(product) valid until: \(product.expirationDateString)\n"
-			case .consumable: text += "\(product)\n"
-			case .nonConsumable: text += "\(product)\n"
-			case .none: text += "Bad product: \(product)\n"
-			case .notSet: text += "Not set: \(product)"
-			}
-		}
-		
-		print("-------------------------------\n" + text + "-------------------------------")
-	}
-}
-
-extension SKPaymentTransaction {
-	var detailedDescription: String {
-		var text = "\(self.payment.productIdentifier) - \(self.transactionState.description)"
-		
-		if let date = self.transactionDate {
-			text += " at \(date.description)"
-		}
-		
-		return text
-	}
-}
-
-extension SKPaymentTransactionState {
-	var description: String {
-		switch self {
-		case .deferred: return "deferred"
-		case .failed: return "failed"
-		case .purchased: return "purchased"
-		case .purchasing: return "purchasing"
-		case .restored: return "restored"
-		default: return "unknown state"
-		}
-	}
-}
-
-extension Error {
-	public var isStoreKitCancellation: Bool {
-		let err: Error? = self
-		
-		return (err as NSError?)?.code == 2 && (err as NSError?)?.domain == SKErrorDomain
-	}
-}
-
-extension Capitalist {
-	public enum Distribution { case development, testflight, appStore }
-	public enum ReceiptOverride { case production, sandbox
-		var receiptName: String {
-			switch self {
-			case .production: return "receipt"
-			case .sandbox: return "sandboxReceipt"
-			}
-		}
-	}
-
-	public static var distribution: Distribution {
-		#if DEBUG
-			return .development
-		#else
-			#if os(OSX)
-				let bundlePath = Bundle.main.bundleURL
-				let receiptURL = bundlePath.appendingPathComponent("Contents").appendingPathComponent("_MASReceipt").appendingPathComponent("receipt")
-				
-				return FileManager.default.fileExists(atPath: receiptURL.path) ? .appStore : .development
-			#else
-				#if targetEnvironment(simulator)
-					return .development
-				#endif
-				if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" && MobileProvisionFile.default?.properties["ProvisionedDevices"] == nil { return .testflight }
-			
-				return .appStore
-			#endif
-		#endif
-	}
-}
-
-
-fileprivate class MobileProvisionFile {
-	fileprivate convenience init?(url: URL?) { self.init(data: url == nil ? nil : try? Data(contentsOf: url!)) }
-	
-	fileprivate var properties: NSDictionary!
-	
-	fileprivate static var `default`: MobileProvisionFile? = MobileProvisionFile(url: Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"))
-	fileprivate init?(data: Data?) {
-		guard let data = data else { return nil }
-		
-		guard let file = String(data: data, encoding: .ascii) else { return nil }
-		let scanner = Scanner(string: file)
-		if scanner.scanStringUpTo(string: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>") != nil, let contents = scanner.scanStringUpTo(string: "</plist>") {
-			let raw = contents.appending("</plist>")
-			self.properties = raw.propertyList() as? NSDictionary
-		}
-		
-		if self.properties == nil { return nil }
-	}
-}
-
-
-fileprivate extension Scanner {
-	 func scanStringUpTo(string: String) -> String? {
-		if #available(iOS 13.0, iOSApplicationExtension 13.0, watchOS 6.0, OSX 10.15, OSXApplicationExtension 10.15, *) {
-				return self.scanString(string)
-		  } else {
-				var result: NSString?
-				self.scanUpTo(string, into: &result)
-				return result as String?
-		  }
-	 }
-}
-
 #if canImport(Combine)
 
 	@available(OSX 10.15, iOS 13.0, tvOS 13, watchOS 6, *)
@@ -471,7 +203,11 @@ fileprivate extension Scanner {
 	extension Capitalist {
 		 func objectChanged() {
 			  if #available(OSX 10.15, iOS 13.0, tvOS 13, watchOS 6, *) {
-					objectWillChange.send()
+				  if Thread.isMainThread {
+					  objectWillChange.send()
+				  } else {
+					  Task { await MainActor.run { objectWillChange.send() }}
+				  }
 			  }
 		 }
 	}

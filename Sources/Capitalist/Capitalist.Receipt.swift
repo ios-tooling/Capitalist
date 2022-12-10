@@ -30,7 +30,14 @@ extension Capitalist {
 	}
 
 	public func currentExpirationDate(for productIDs: [Product.ID] = Capitalist.instance.allProductIDs) -> Date? {
-		currentExpirationDateAndProduct(for: productIDs)?.date
+		if let date = currentExpirationDateAndProduct(for: productIDs)?.date { return date }
+		
+		for id in productIDs {
+			guard let product = self.product(for: id) else { continue }
+			
+			if let date = expiresAt(for: product) { return date }
+		}
+		return nil
 	}
 	
 	public func isInTrial(for productIDs: [Product.ID]) -> Bool {
@@ -200,6 +207,8 @@ extension Capitalist {
 								print("Bad status (\(status)) returned from the AppStore.")
 								self.callValidationCompletions()
 							} else {
+								self.receiptDecodeFailed = false
+								Capitalist.instance.clearAllExpirationDates()
 								self.lastValidReceiptData = data
 								self.updateCachedReceipt(label: "Post Validation", receipt: info)
 								self.callValidationCompletions()

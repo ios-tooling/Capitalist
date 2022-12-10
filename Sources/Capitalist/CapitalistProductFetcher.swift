@@ -1,5 +1,5 @@
 //
-//  File.swift
+//  CapitalistProductFetcher.swift
 //  
 //
 //  Created by Ben Gottlieb on 1/12/22.
