@@ -49,25 +49,27 @@ extension Capitalist {
 	}
 	
 	private func load(receipts: [[String: Any]], latest: [String: Any]?) {
-		self.purchasedConsumables = []
-		for receipt in receipts {
-			guard
-				let id = self.productID(from: receipt["product_id"] as? String ?? ""),
-				let product = Capitalist.instance.product(for: id) ?? Capitalist.Product(product: nil, id: id)
-			else { continue }
-			
-			if self.availableProducts[id] == nil { self.availableProducts[id] = product }
-			if product.id.kind == .consumable, let purchaseDate = receipt.purchaseDate {
-				self.recordConsumablePurchase(of: product.id, at: purchaseDate)
-			} else if product.isOlderThan(receipt: receipt) {
-				self.availableProducts[id]?.info = receipt
-				if self.availableProducts[id]?.id.kind != .consumable, self.availableProducts[id]?.hasPurchased == true, !self.purchasedProducts.contains(id) {
-					self.purchasedProducts.append(id)
+		DispatchQueue.main.async {
+			self.purchasedConsumables = []
+			for receipt in receipts {
+				guard
+					let id = self.productID(from: receipt["product_id"] as? String ?? ""),
+					let product = Capitalist.instance.product(for: id) ?? Capitalist.Product(product: nil, id: id)
+				else { continue }
+				
+				if self.availableProducts[id] == nil { self.availableProducts[id] = product }
+				if product.id.kind == .consumable, let purchaseDate = receipt.purchaseDate {
+					self.recordConsumablePurchase(of: product.id, at: purchaseDate)
+				} else if product.isOlderThan(receipt: receipt) {
+					self.availableProducts[id]?.info = receipt
+					if self.availableProducts[id]?.id.kind != .consumable, self.availableProducts[id]?.hasPurchased == true, !self.purchasedProducts.contains(id) {
+						self.purchasedProducts.append(id)
+					}
 				}
 			}
+			self.hasSales = receipts.count > 0
+			Capitalist.instance.objectChanged()
 		}
-		self.hasSales = receipts.count > 0
-		DispatchQueue.main.async { Capitalist.instance.objectChanged() }
 	}
 	
 	public class Receipt: NSObject {
