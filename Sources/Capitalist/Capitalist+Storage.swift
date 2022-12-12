@@ -30,44 +30,28 @@ extension Capitalist {
 	}
 }
 
-#if canImport(Suite)
-import Suite
-	extension Capitalist {
-		func expiresAt(for product: Capitalist.Product) -> Date? {
-			guard let date = PurchasedSubscriptions.load().d[product.id.rawValue] else { return nil }
-			
-			guard !date.isInFuture, let duration = product.product?.subscriptionPeriod else { return nil }
-			let expires = duration.expiration(startingAt: date)
-			let expiresFromNow = duration.expiration(startingAt: date)
-			if expires.timeIntervalSinceReferenceDate > expiresFromNow.timeIntervalSinceReferenceDate { return nil }
-			return expires
-		}
-	}
-	extension Capitalist.PurchasedSubscriptions {
-		static let keychainKey = "capitalist_subscription_dates"
-		func save() {
-			guard let data = try? JSONEncoder().encode(self) else { return }
-			
-			Keychain.instance.set(data, forKey: Self.keychainKey)
-		}
+extension Capitalist {
+	func expiresAt(for product: Capitalist.Product) -> Date? {
+		guard let date = PurchasedSubscriptions.load().d[product.id.rawValue] else { return nil }
 		
-		static func load() -> Self {
-			if let data = Keychain.instance.getData(keychainKey), let result = try? JSONDecoder().decode(Self.self, from: data) { return result }
-			return .init()
-		}
+		guard !date.isInFuture, let duration = product.product?.subscriptionPeriod else { return nil }
+		let expires = duration.expiration(startingAt: date)
+		let expiresFromNow = duration.expiration(startingAt: date)
+		if expires.timeIntervalSinceReferenceDate > expiresFromNow.timeIntervalSinceReferenceDate { return nil }
+		return expires
 	}
-#else
-	extension Capitalist.PurchasedSubscriptions {
-		static let defaultsKey = "s_dates"
-		func save() {
-		}
+}
+extension Capitalist.PurchasedSubscriptions {
+	static let defaultsKey = "c_sed"
+	func save() {
+		guard let data = try? JSONEncoder().encode(self) else { return }
 		
-		static func load() -> Self {
-			return Self()
-		}
+		UserDefaults.standard.set(data, forKey: Self.defaultsKey)
 	}
 	
-	extension Capitalist {
-		func expiresAt(for product: Capitalist.Product) -> Date? { nil }
+	static func load() -> Self {
+		if !Capitalist.instance.storeExpirationDatesInDefaults { return .init() }
+		if let data = UserDefaults.standard.data(forKey: Self.defaultsKey), let result = try? JSONDecoder().decode(Self.self, from: data) { return result }
+		return .init()
 	}
-#endif
+}

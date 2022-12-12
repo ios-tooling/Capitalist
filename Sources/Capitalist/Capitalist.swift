@@ -36,6 +36,7 @@ public class Capitalist: NSObject {
 	public var reportedError: Error? { didSet { self.objectChanged() }}
 	public var receiptOverride: ReceiptOverride?
 	public var hasSales = false
+	public var storeExpirationDatesInDefaults = false
 
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
 	
@@ -174,11 +175,15 @@ public class Capitalist: NSObject {
 			completion?(purchased, nil)
 			self.state = .idle
 			NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: purchased, userInfo: Notification.purchaseFlagsDict(restored ? .restored : []))
-			if self.receipt.receiptDecodeFailed {
+			#if targetEnvironment(simulator)
 				self.saveLocalExpirationDate(for: purchased)
-			} else {
-				self.clearLocalExpirationDate(for: purchased)
-			}
+			#else
+				if self.receipt.receiptDecodeFailed {
+					self.saveLocalExpirationDate(for: purchased)
+				} else {
+					self.clearLocalExpirationDate(for: purchased)
+				}
+			#endif
 			self.delegate?.didPurchase(product: purchased, flags: restored ? .restored : [])
 			self.objectChanged()
 		}
