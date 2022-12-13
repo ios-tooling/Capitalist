@@ -30,7 +30,11 @@ extension Capitalist {
 			case .oneYear: components.year = 1
 			}
 			
-			return Calendar.current.date(byAdding: components, to: startingAt) ?? startingAt
+			if let date = Calendar.current.date(byAdding: components, to: startingAt) {
+				return date
+			}
+			
+			return startingAt
 		}
 	}
 	public struct Product: CustomStringConvertible, Equatable {
