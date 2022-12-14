@@ -161,6 +161,7 @@ extension Capitalist {
 			}
 			hasCheckedReceipt = true
 			if Capitalist.instance.loggingOn { print("No local receipt found") }
+			completion?(nil)
 			return false
 		}
 
