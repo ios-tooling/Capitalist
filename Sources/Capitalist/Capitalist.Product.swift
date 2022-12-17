@@ -335,7 +335,9 @@ extension Dictionary where Key == String {
 
 extension SKProductSubscriptionPeriod {
 	func expiration(startingAt: Date) -> Date {
-		return startingAt.addingTimeInterval(duration)
+		let subDuration = duration
+		let newDate = startingAt.addingTimeInterval(subDuration)
+		return newDate
 	}
 	
 	var duration: TimeInterval {

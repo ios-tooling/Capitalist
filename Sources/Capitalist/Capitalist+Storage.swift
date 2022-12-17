@@ -34,10 +34,8 @@ extension Capitalist {
 	func expiresAt(for product: Capitalist.Product) -> Date? {
 		guard let date = PurchasedSubscriptions.load().d[product.id.rawValue] else { return nil }
 		
-		guard date > Date(), let duration = product.product?.subscriptionPeriod else { return nil }
+		guard let duration = product.product?.subscriptionPeriod else { return nil }
 		let expires = duration.expiration(startingAt: date)
-		let expiresFromNow = duration.expiration(startingAt: date)
-		if expires.timeIntervalSinceReferenceDate > expiresFromNow.timeIntervalSinceReferenceDate { return nil }
 		return expires
 	}
 }
