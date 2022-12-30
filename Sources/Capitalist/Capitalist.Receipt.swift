@@ -33,7 +33,7 @@ extension Capitalist {
 		if let date = currentExpirationDateAndProduct(for: productIDs)?.date { return date }
 		
 		for id in productIDs {
-			guard let product = self.product(for: id) else { continue }
+			guard let product = self[id] else { continue }
 			
 			if let date = expiresAt(for: product) { return date }
 		}
@@ -54,7 +54,7 @@ extension Capitalist {
 			for receipt in receipts {
 				guard
 					let id = self.productID(from: receipt["product_id"] as? String ?? ""),
-					let product = Capitalist.instance.product(for: id) ?? Capitalist.Product(product: nil, id: id)
+					let product = Capitalist.instance[id]
 				else { continue }
 				
 				if self.availableProducts[id] == nil { self.availableProducts[id] = product }

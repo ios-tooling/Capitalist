@@ -37,6 +37,7 @@ extension Capitalist {
 			return startingAt
 		}
 	}
+	
 	public struct Product: CustomStringConvertible, Equatable {
 		public struct ID: Equatable, Hashable, CustomStringConvertible {
 			public enum Kind: String { case none, nonConsumable, consumable, subscription, notSet }
@@ -60,13 +61,21 @@ extension Capitalist {
 		}
 		
 		public init?(product: SKProduct?, id localID: ID? = nil, info: [String: Any]? = nil) {
-			guard let id = localID ?? Capitalist.instance.productID(from: product?.productIdentifier) else {
+			guard let id = localID ?? product?.productIdentifier.capitalistProductID else {
 				self.id = .none
 				return nil
 			}
 			self.info = info
 			self.id = id
 			self.product = product
+		}
+		
+		@available(iOS 15.0, *)
+		public init?(product: StoreKit.Product, info: [String: Any]? = nil) {
+			guard let capProd = Capitalist.instance[product.id] else { return nil }
+			self.info = info
+			self.id = capProd.id
+			self.product2 = product
 		}
 		
 		public var introductoryPrice: String? {
@@ -80,6 +89,12 @@ extension Capitalist {
 		
 		@available(OSX 10.13.2, iOS 11.2, *)
 		public var freeTrialDays: Int? {
+			if #available(iOS 15.0, *) {
+				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
+					print("Need to calculate freeTrialDays for StoreKit2: \(prod)")
+				}
+			}
+
 			guard let intro = self.product?.introductoryPrice, intro.paymentMode == .freeTrial else { return nil }
 			
 			let count = intro.subscriptionPeriod.numberOfUnits
@@ -94,6 +109,12 @@ extension Capitalist {
 
 		@available(OSX 10.13.2, iOS 11.2, *)
 		public var freeTrialDurationDescription: String? {
+			if #available(iOS 15.0, *) {
+				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
+					print("Need to calculate freeTrialDurationDescription for StoreKit2: \(prod)")
+				}
+			}
+
 			guard let intro = self.product?.introductoryPrice, intro.paymentMode == .freeTrial else { return nil }
 			
 			let count = intro.subscriptionPeriod.numberOfUnits
@@ -134,8 +155,14 @@ extension Capitalist {
 		var info: [String: Any]?
 		public let id: Capitalist.Product.ID
 		public var product: SKProduct?
+		public var product2: Any?
 		var recentPurchaseDate: Date? { didSet { updateSubscriptionInfo() }}
+		var expirationDate: Date?
 		var onDeviceExpirationDate: Date?
+		
+		var isPurchaseable: Bool {
+			product != nil || product2 != nil
+		}
 		
 		static let currencyFormatter: NumberFormatter = {
 			let formatter = NumberFormatter()
@@ -154,10 +181,37 @@ extension Capitalist {
 			return ExpirationReason(rawValue: reason)
 		}
 		
-		public var title: String? { self.product?.localizedTitle }
-		public var rawPrice: Double? { return self.product?.price.doubleValue }
-		public var price: NSDecimalNumber? { return self.product?.price }
+		public var title: String? {
+			if #available(iOS 15.0, *) {
+				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
+					return prod.displayName
+				}
+			}
+			return self.product?.localizedTitle
+		}
+		public var rawPrice: Double? {
+			if #available(iOS 15.0, *) {
+				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
+					return Double(truncating: prod.price as NSNumber)
+				}
+			}
+			return self.product?.price.doubleValue
+		}
+		
+		public var price: NSDecimalNumber? {
+			if #available(iOS 15.0, *) {
+				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
+					return prod.price as NSDecimalNumber
+				}
+			}
+			return self.product?.price
+		}
 		public var localizedPrice: String? {
+			if #available(iOS 15.0, *) {
+				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
+					return prod.displayPrice
+				}
+			}
 			guard let product = self.product else { return nil }
 			Self.currencyFormatter.locale = product.priceLocale
 			return Self.currencyFormatter.string(from: product.price)
@@ -181,6 +235,7 @@ extension Capitalist {
 			}
 		}
 		public var subscriptionExpirationDate: Date? {
+			if let expirationDate { return expirationDate }
 			guard let onDevice = onDeviceExpirationDate else { return self.date(for: "expires_date") }
 			guard let receipt = self.date(for: "expires_date") else { return onDevice }
 			
@@ -355,5 +410,11 @@ extension SKProduct.PeriodUnit {
 		case .year: return 365 * 1440 * 60
 		default: return 0
 		}
+	}
+}
+
+fileprivate extension String {
+	var capitalistProductID: Capitalist.Product.ID? {
+		Capitalist.instance.productID(from: self)
 	}
 }

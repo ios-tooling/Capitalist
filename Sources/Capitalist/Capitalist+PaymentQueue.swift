@@ -24,7 +24,7 @@ extension Capitalist: SKPaymentTransactionObserver {
 		for transaction in transactions {
 			switch transaction.transactionState {
 			case .purchased, .restored:
-				if let product = self.product(from: self.productID(from: transaction.payment.productIdentifier)) {
+				if let product = self[transaction.payment.productIdentifier] {
 					self.recordPurchase(of: product, at: transaction.transactionDate, restored: transaction.transactionState == .restored)
 				} else {
 					if let newProduct = Capitalist.Product(product: nil, id: Product.ID(rawValue: transaction.payment.productIdentifier, kind: .notSet)) {
@@ -38,12 +38,12 @@ extension Capitalist: SKPaymentTransactionObserver {
 			case .purchasing: print("Started purchase flow for \(transaction.payment.productIdentifier)")
 			case .deferred: print("Purchased deferred for \(transaction.payment.productIdentifier)")
 			case .failed:
-				self.failPurchase(of: self.product(from: self.productID(from: transaction.payment.productIdentifier)), dueTo: transaction.error)
+				self.failPurchase(of: self[transaction.payment.productIdentifier], dueTo: transaction.error)
 				SKPaymentQueue.default().finishTransaction(transaction)
 				
 				
 			@unknown default:
-				self.failPurchase(of: self.product(from: self.productID(from: transaction.payment.productIdentifier)), dueTo: transaction.error)
+				self.failPurchase(of: self[transaction.payment.productIdentifier], dueTo: transaction.error)
 				SKPaymentQueue.default().finishTransaction(transaction)
 			}
 		}

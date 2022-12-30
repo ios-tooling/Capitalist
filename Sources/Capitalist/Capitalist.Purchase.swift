@@ -25,13 +25,16 @@ extension Capitalist {
 		return product
 	}
 	
+	func reportError(_ error: Error, for id: Product.ID) {
+		NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: id, userInfo: ["error": CapitalistError.productNotFound])
+		delegate?.didFailToPurchase(productID: id, error: CapitalistError.productNotFound)
+	}
+	
 	@discardableResult
 	public func purchase(_ id: Product.ID, completion: ((Product?, Error?) -> Void)? = nil) -> Bool {
-		guard let product = self.product(for: id) else {
+		guard let product = self[id] else {
 			completion?(nil, CapitalistError.productNotFound)
-			
-			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: id, userInfo: ["error": CapitalistError.productNotFound])
-			delegate?.didFailToPurchase(productID: id, error: CapitalistError.productNotFound)
+			reportError(CapitalistError.productNotFound, for: id)
 			return false
 		}
 		
@@ -40,12 +43,59 @@ extension Capitalist {
 	
 	@discardableResult
 	public func purchase(_ product: Product, completion: ((Product?, Error?) -> Void)? = nil) -> Bool {
-		guard let skProduct = product.product else {
-			completion?(nil, CapitalistError.productNotFound)
+		if #available(iOS 15, macOS 12, *), useStoreKit2 {
+			guard let prod = product.product2 as? StoreKit.Product else {
+				completion?(nil, CapitalistError.storeKit2ProductNotFound)
+				reportError(CapitalistError.storeKit2ProductNotFound, for: product.id)
+				
+				return false
+			}
 			
-			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: product.id, userInfo: ["error": CapitalistError.productNotFound])
-			delegate?.didFailToPurchase(productID: product.id, error: CapitalistError.productNotFound)
+			Task {
+				do {
+					let result = try await prod.purchase(options: [])
+					switch result {
+					case .success(let verificationResult):
+						switch verificationResult {
+						case .unverified(_, let verificiationError):
+							completion?(nil, CapitalistError.unverified)
+							reportError(CapitalistError.unverified, for: product.id)
+							print("Purchase was unverified for \(product), \(verificiationError)")
+							completion?(nil, CapitalistError.unverified)
+							
+						case .verified(let transaction):
+							print("Success! \(transaction)")
+							self.recordPurchase(of: product, at: transaction.purchaseDate, restored: false)
+							completion?(product, nil)
+						}
+						
+					case .userCancelled:
+						completion?(nil, CapitalistError.cancelled)
+						reportError(CapitalistError.cancelled, for: product.id)
+						print("User cancelled purchase of \(product)")
+						completion?(nil, CapitalistError.cancelled)
+					case .pending:
+						completion?(nil, CapitalistError.purchasePending)
+						reportError(CapitalistError.purchasePending, for: product.id)
+						print("Purhcase is pending for \(product)")
+						completion?(nil, CapitalistError.purchasePending)
+					@unknown default:
+						completion?(nil, CapitalistError.unknownStoreKitError)
+						reportError(CapitalistError.unknownStoreKitError, for: product.id)
+						print("Unknown storekit error for \(product)")
+						completion?(nil, CapitalistError.unknownStoreKitError)
+					}
+				} catch {
+					completion?(nil, error)
+					reportError(error, for: product.id)
+				}
+			}
+			return true
+		}
 
+		guard let skProduct = product.product else {
+			completion?(nil, CapitalistError.storeKitProductNotFound)
+			reportError(CapitalistError.storeKitProductNotFound, for: product.id)
 			return false
 		}
 

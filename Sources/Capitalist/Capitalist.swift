@@ -37,6 +37,7 @@ public class Capitalist: NSObject {
 	public var receiptOverride: ReceiptOverride?
 	public var hasSales = false
 	public var storeExpirationDatesInDefaults = false
+	public var useStoreKit2 = false
 
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
 	
@@ -51,12 +52,16 @@ public class Capitalist: NSObject {
 	
 	public var currentReceiptData: Data? { receipt.receiptData }
 	
-	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false, validatingReceiptWithServer: Bool = true, receiptOverride: ReceiptOverride? = nil) {
+	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false, validatingReceiptWithServer: Bool = true, receiptOverride: ReceiptOverride? = nil, useStoreKit2: Bool = true) {
 		if isSetup {
 			print("Capitalist.setup() should only be called once.")
 			return
 		}
 		
+		if #available(iOS 15, macOS 12, *), useStoreKit2 {
+			self.useStoreKit2 = true
+			startStoreKit2Listener()
+		}
 		if let over = receiptOverride { self.receiptOverride = over }
 		isSetup = true
 		self.delegate = delegate
@@ -128,15 +133,25 @@ public class Capitalist: NSObject {
 		}
 	}
 	
-	public func product(for id: Product.ID) -> Product? {
-		return self.availableProducts[id]
+	public subscript(id: Product.ID?) -> Product? {
+		guard let id else { return nil }
+		return availableProducts[id]
 	}
 	
-	public func isProductAvailable(_ id: Product.ID) -> Bool { product(for: id) != nil }
+	public subscript(string: String?) -> Product? {
+		guard let id = productID(from: string) else { return nil }
+		return availableProducts[id]
+	}
+	
+	public func productID(from string: String?) -> Product.ID? {
+		return self.allProductIDs.filter({ $0.rawValue == string }).first
+	}
+	
+	public func isProductAvailable(_ id: Product.ID) -> Bool { availableProducts[id] != nil }
 	
 	public func canPurchase(_ id: Product.ID) -> Bool {
 		if self.state != .idle, self.state != .restoring { return false }
-		guard !id.isPrepurchased, let product = self.product(for: id), product.product != nil else { return false }
+		guard !id.isPrepurchased, let product = self[id], product.isPurchaseable else { return false }
 		
 		switch product.id.kind {
 		case .consumable: return true
@@ -147,7 +162,7 @@ public class Capitalist: NSObject {
 		}
 	}
 	
-	func recordPurchase(of product: Product, at date: Date?, restored: Bool) {
+	func recordPurchase(of product: Product, at date: Date?, expirationDate: Date? = nil, restored: Bool) {
 		if !purchasedProducts.contains(product.id) || product.id.kind == .consumable { self.purchasedProducts.append(product.id) }
 		
 		if let purchasedAt = date {
@@ -157,6 +172,7 @@ public class Capitalist: NSObject {
 				
 			case .subscription:
 				availableProducts[product.id]?.recentPurchaseDate = purchasedAt
+				availableProducts[product.id]?.expirationDate = expirationDate
 				
 			default: break
 			}
@@ -171,31 +187,25 @@ public class Capitalist: NSObject {
 		self.purchaseCompletion = nil
 		
 		self.receipt.loadBundleReceipt { error in
-			if let err = error { print("Error when loading local receipt: \(err)") }
-			completion?(purchased, nil)
-			self.state = .idle
-			NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: purchased, userInfo: Notification.purchaseFlagsDict(restored ? .restored : []))
-			#if targetEnvironment(simulator)
-				self.saveLocalExpirationDate(for: purchased)
-			#else
-				if self.receipt.receiptDecodeFailed {
+			if let err = error {
+				print("Error when loading local receipt: \(err)")
+			} else {
+				self.state = .idle
+				NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: purchased, userInfo: Notification.purchaseFlagsDict(restored ? .restored : []))
+				#if targetEnvironment(simulator)
 					self.saveLocalExpirationDate(for: purchased)
-				} else {
-					self.clearLocalExpirationDate(for: purchased)
-				}
-			#endif
+				#else
+					if self.receipt.receiptDecodeFailed {
+						self.saveLocalExpirationDate(for: purchased)
+					} else {
+						self.clearLocalExpirationDate(for: purchased)
+					}
+				#endif
+			}
+			completion?(purchased, nil)
 			self.delegate?.didPurchase(product: purchased, flags: restored ? .restored : [])
 			self.objectChanged()
 		}
-	}
-	
-	public func product(from id: Product.ID?) -> Product? {
-		guard let id = id else { return nil }
-		return self.availableProducts[id]
-	}
-	
-	public func productID(from string: String?) -> Product.ID? {
-		return self.allProductIDs.filter({ $0.rawValue == string }).first
 	}
 }
 

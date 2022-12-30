@@ -20,7 +20,7 @@ import Foundation
 open class ProductWatcher: NSObject {
 	public let productID: Capitalist.Product.ID
 	public var product: Capitalist.Product? {
-		Capitalist.instance.product(for: self.productID)
+		Capitalist.instance[self.productID]
 	}
 	
 	#if os(OSX)

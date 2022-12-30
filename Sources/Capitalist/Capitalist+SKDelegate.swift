@@ -39,10 +39,18 @@ extension Capitalist: SKRequestDelegate {
 	}
 	
 	func load(products: [SKProduct]) {
+		objectWillChange.send()
 		products.forEach {
 			if let prod = self.productID(from: $0.productIdentifier) {
 				self.availableProducts[prod] = Product(product: $0)
 			}
+		}
+	}
+	
+	func load(products: [Product]) {
+		objectWillChange.send()
+		products.forEach { product in
+			self.availableProducts[product.id] = product
 		}
 	}
 }
@@ -60,8 +68,13 @@ extension Capitalist {
 		self.purchaseQueue.suspend()
 		let products = productIDs ?? self.allProductIDs
 		allProductIDs = products
+		for productID in products {
+			if availableProducts[productID] == nil {
+				availableProducts[productID] = Product(product: nil, id: productID, info: nil)
+			}
+		}
 		
-		productsRequest = ProductFetcher(ids: products) { result in
+		productsRequest = ProductFetcher(ids: products, useStoreKit2: useStoreKit2) { result in
 			switch result {
 			case .failure(let err):
 				self.productFetchError = err
@@ -75,10 +88,15 @@ extension Capitalist {
 				self.delegate?.didFetchProducts()
 				DispatchQueue.main.async { self.objectChanged() }
 			}
+			
 			self.productsRequest = nil
 			if let next = self.pendingProducts {
 				self.pendingProducts = nil
 				self.requestProducts(productIDs: next)
+			} else {
+				if #available(iOS 15.0, *), self.useStoreKit2 {
+					self.checkStoreKit2Transactions()
+				}
 			}
 		}
 		DispatchQueue.main.async { self.purchaseQueue.resume() }
@@ -88,7 +106,7 @@ extension Capitalist {
 		var text = label + "\n"
 		
 		for id in purchasedProducts {
-			guard let product = self.product(for: id) else { continue }
+			guard let product = self[id] else { continue }
 			
 			switch id.kind {
 			case .subscription: text += "\(product) valid until: \(product.expirationDateString)\n"
