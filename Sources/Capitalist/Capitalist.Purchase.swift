@@ -26,8 +26,8 @@ extension Capitalist {
 	}
 	
 	func reportError(_ error: Error, for id: Product.ID) {
-		NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: id, userInfo: ["error": CapitalistError.productNotFound])
-		delegate?.didFailToPurchase(productID: id, error: CapitalistError.productNotFound)
+		NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: id, userInfo: ["error": error])
+		delegate?.didFailToPurchase(productID: id, error: error)
 	}
 	
 	@discardableResult
