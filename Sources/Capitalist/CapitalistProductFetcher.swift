@@ -23,25 +23,25 @@ extension Capitalist {
 		}
 		
 		func fetch(ids: [Capitalist.Product.ID], completion: @escaping ProductCompletion) {
-			if #available(iOS 15.0, *), useStoreKit2 {
+			if #available(iOS 15.0, macOS 12, *), useStoreKit2 {
 				Task {
 					do {
 						let skProds = try await StoreKit.Product.products(for: ids.map { $0.rawValue })
 						let prods = skProds.compactMap { Product(product: $0) }
 						Capitalist.instance.load(products: prods)
 						completion(.success(prods))
-						
 					} catch {
 						print("Failed to fetch products: \(error)")
 						completion(.failure(error))
 					}
 				}
 				return
+			} else {
+				self.completion = completion
+				request = SKProductsRequest(productIdentifiers: Set(ids.map({ $0.rawValue })))
+				request.delegate = self
+				request.start()
 			}
-			self.completion = completion
-			request = SKProductsRequest(productIdentifiers: Set(ids.map({ $0.rawValue })))
-			request.delegate = self
-			request.start()
 		}
 
 		public func productsRequest(_ request: SKProductsRequest, didReceive response: SKProductsResponse) {

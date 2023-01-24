@@ -64,9 +64,10 @@ extension Capitalist {
 			return
 		}
 		
+		let products = productIDs ?? self.allProductIDs
+		if products.isEmpty { return }
 		self.state = .fetchingProducts
 		self.purchaseQueue.suspend()
-		let products = productIDs ?? self.allProductIDs
 		allProductIDs = products
 		for productID in products {
 			if availableProducts[productID] == nil {
@@ -95,7 +96,7 @@ extension Capitalist {
 				self.requestProducts(productIDs: next)
 			} else {
 				if #available(iOS 15.0, *), self.useStoreKit2 {
-					self.checkStoreKit2Transactions()
+					//self.checkStoreKit2Transactions()
 				}
 			}
 		}

@@ -70,7 +70,7 @@ extension Capitalist {
 			self.product = product
 		}
 		
-		@available(iOS 15.0, *)
+		@available(iOS 15.0, macOS 12.0, *)
 		public init?(product: StoreKit.Product, info: [String: Any]? = nil) {
 			guard let capProd = Capitalist.instance[product.id] else { return nil }
 			self.info = info
@@ -89,7 +89,7 @@ extension Capitalist {
 		
 		@available(OSX 10.13.2, iOS 11.2, *)
 		public var freeTrialDays: Int? {
-			if #available(iOS 15.0, *) {
+			if #available(iOS 15.0, macOS 12.0, *) {
 				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
 					print("Need to calculate freeTrialDays for StoreKit2: \(prod)")
 				}
@@ -109,7 +109,7 @@ extension Capitalist {
 
 		@available(OSX 10.13.2, iOS 11.2, *)
 		public var freeTrialDurationDescription: String? {
-			if #available(iOS 15.0, *) {
+			if #available(iOS 15.0, macOS 12.0, *) {
 				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
 					print("Need to calculate freeTrialDurationDescription for StoreKit2: \(prod)")
 				}
@@ -182,7 +182,7 @@ extension Capitalist {
 		}
 		
 		public var title: String? {
-			if #available(iOS 15.0, *) {
+			if #available(iOS 15.0, macOS 12.0, *) {
 				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
 					return prod.displayName
 				}
@@ -190,7 +190,7 @@ extension Capitalist {
 			return self.product?.localizedTitle
 		}
 		public var rawPrice: Double? {
-			if #available(iOS 15.0, *) {
+			if #available(iOS 15.0, macOS 12.0, *) {
 				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
 					return Double(truncating: prod.price as NSNumber)
 				}
@@ -199,7 +199,7 @@ extension Capitalist {
 		}
 		
 		public var price: NSDecimalNumber? {
-			if #available(iOS 15.0, *) {
+			if #available(iOS 15.0, macOS 12.0, *) {
 				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
 					return prod.price as NSDecimalNumber
 				}
@@ -207,7 +207,7 @@ extension Capitalist {
 			return self.product?.price
 		}
 		public var localizedPrice: String? {
-			if #available(iOS 15.0, *) {
+			if #available(iOS 15.0, macOS 12.0, *) {
 				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
 					return prod.displayPrice
 				}
