@@ -59,27 +59,29 @@ extension Capitalist: SKPaymentTransactionObserver {
 			return
 		}
 		
-		let completion = self.purchaseCompletion
-		if let index = waitingPurchases.firstIndex(of: prod.id) {
-			waitingPurchases.remove(at: index)
-		}
-		
-		self.purchaseCompletion = nil
-		
-		if self.state == .purchasing(prod) {
-			var userInfo: [String: Any]? = error != nil ? ["error": error!] : nil
-			if let err = error as? SKError, err.code == .paymentCancelled || err.code == .paymentNotAllowed { userInfo = nil }
-			self.state = .idle
-			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: prod.id, userInfo: userInfo)
-			
-			if (error as? SKError)?.code == .paymentCancelled {
-				delegate?.didFailToPurchase(productID: prod.id, error: CapitalistError.cancelled)
-			} else {
-				delegate?.didFailToPurchase(productID: prod.id, error: error ?? CapitalistError.unknownStoreKitError)
+		DispatchQueue.main.async {
+			let completion = self.purchaseCompletion
+			if let index = self.waitingPurchases.firstIndex(of: prod.id) {
+				self.waitingPurchases.remove(at: index)
 			}
+			
+			self.purchaseCompletion = nil
+			
+			if self.state == .purchasing(prod) {
+				var userInfo: [String: Any]? = error != nil ? ["error": error!] : nil
+				if let err = error as? SKError, err.code == .paymentCancelled || err.code == .paymentNotAllowed { userInfo = nil }
+				self.state = .idle
+				NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: prod.id, userInfo: userInfo)
+				
+				if (error as? SKError)?.code == .paymentCancelled {
+					self.delegate?.didFailToPurchase(productID: prod.id, error: CapitalistError.cancelled)
+				} else {
+					self.delegate?.didFailToPurchase(productID: prod.id, error: error ?? CapitalistError.unknownStoreKitError)
+				}
+			}
+			
+			completion?(product, error)
+			print("Failed to purchase \(prod), \(error?.localizedDescription ?? "no error description").")
 		}
-		
-		completion?(product, error)
-		print("Failed to purchase \(prod), \(error?.localizedDescription ?? "no error description").")
 	}
 }

@@ -202,9 +202,11 @@ public class Capitalist: NSObject {
 					}
 				#endif
 			}
-			completion?(purchased, nil)
-			self.delegate?.didPurchase(product: purchased, flags: restored ? .restored : [])
-			self.objectChanged()
+			DispatchQueue.main.async {
+				completion?(purchased, nil)
+				self.delegate?.didPurchase(product: purchased, flags: restored ? .restored : [])
+				self.objectChanged()
+			}
 		}
 	}
 }

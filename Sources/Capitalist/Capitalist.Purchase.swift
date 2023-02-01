@@ -26,8 +26,10 @@ extension Capitalist {
 	}
 	
 	func reportError(_ error: Error, for id: Product.ID) {
-		NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: id, userInfo: ["error": error])
-		delegate?.didFailToPurchase(productID: id, error: error)
+		DispatchQueue.main.async {
+			NotificationCenter.default.post(name: Notifications.didFailToPurchaseProduct, object: id, userInfo: ["error": error])
+			self.delegate?.didFailToPurchase(productID: id, error: error)
+		}
 	}
 	
 	@discardableResult
@@ -110,10 +112,12 @@ extension Capitalist {
 		self.purchaseCompletion = completion
 		self.purchaseQueue.async {
 			if product.id.kind == .nonConsumable, self.hasPurchased(product.id) {
-				self.purchaseCompletion?(product, nil)
-				NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: product, userInfo: Notification.purchaseFlagsDict(.prepurchased))
-				self.delegate?.didPurchase(product: product, flags: .prepurchased)
-				self.state = .idle
+				DispatchQueue.main.async {
+					self.purchaseCompletion?(product, nil)
+					NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: product, userInfo: Notification.purchaseFlagsDict(.prepurchased))
+					self.delegate?.didPurchase(product: product, flags: .prepurchased)
+					self.state = .idle
+				}
 				return
 			}
 			
