@@ -27,6 +27,9 @@ extension Capitalist {
 				Task {
 					do {
 						let skProds = try await StoreKit.Product.products(for: ids.map { $0.rawValue })
+						if skProds.isEmpty {
+							print("😫 No products? Check https://developer.apple.com/library/archive/technotes/tn2413/_index.html")
+						}
 						let prods = skProds.compactMap { Product(product: $0) }
 						Capitalist.instance.load(products: prods)
 						completion(.success(prods))
@@ -47,6 +50,10 @@ extension Capitalist {
 		public func productsRequest(_ request: SKProductsRequest, didReceive response: SKProductsResponse) {
 			Capitalist.instance.load(products: response.products)
 			
+			if response.products.isEmpty {
+				print("😫 No products? Check https://developer.apple.com/library/archive/technotes/tn2413/_index.html")
+			}
+
 			completion?(.success(response.products.compactMap { Product(product: $0) }))
 			request.delegate = nil
 			completion = nil
