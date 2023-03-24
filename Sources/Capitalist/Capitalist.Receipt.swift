@@ -182,7 +182,7 @@ extension Capitalist {
 			var request = URLRequest(url: url)
 			request.httpBody = try! JSONSerialization.data(withJSONObject: dict, options: [])
 			request.httpMethod = "POST"
-			request.addValue("application/json", forHTTPHeaderField: "Content-type")
+			request.addValue("application/json", forHTTPHeaderField: "Content-Type")
 			receiptDecodeFailed = false
 			
 			let task = URLSession.shared.dataTask(with: request) { result, response, error in
