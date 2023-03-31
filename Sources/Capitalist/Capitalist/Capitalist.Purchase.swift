@@ -67,7 +67,7 @@ extension Capitalist {
 							
 						case .verified(let transaction):
 							print("Success! \(transaction)")
-							self.recordPurchase(of: product, at: transaction.purchaseDate, restored: false)
+							self.recordPurchase(of: product, at: transaction.purchaseDate, expirationDate: transaction.expirationDate, restored: false)
 							completion?(product, nil)
 						}
 						
