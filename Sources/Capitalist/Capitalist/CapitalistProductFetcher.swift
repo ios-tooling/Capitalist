@@ -23,6 +23,11 @@ extension Capitalist {
 		}
 		
 		func fetch(ids: [Capitalist.Product.ID], completion: @escaping ProductCompletion) {
+			if ids.isEmpty {
+				print("Trying to fetch an empty product list. Rethink your choices.")
+				completion(.success([]))
+				return
+			}
 			if #available(iOS 15.0, macOS 12, *), useStoreKit2 {
 				Task {
 					do {
