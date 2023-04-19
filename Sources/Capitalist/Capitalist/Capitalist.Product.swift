@@ -152,7 +152,7 @@ extension Capitalist {
 			return receiptPurchaseDate > purchaseDate
 		}
 		
-		var info: [String: Any]?
+		public var info: [String: Any]?
 		public let id: Capitalist.Product.ID
 		public var product: SKProduct?
 		public var product2: Any?
