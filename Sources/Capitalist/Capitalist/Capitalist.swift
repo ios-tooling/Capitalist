@@ -157,22 +157,24 @@ public class Capitalist: NSObject {
 	func addAvailableProduct(_ product: Capitalist.Product?) {
 		guard let product else { return }
 		
-		processingQueue.async { self._addAvailableProduct(product) }
+		processingQueue.sync { self._addAvailableProduct(product) }
 	}
 	
 	func _addAvailableProduct(_ product: Capitalist.Product) {
-		if !allProductIDs.contains(product.id) { allProductIDs.append(product.id) }
-
-		if let current = availableProducts[product.id] {
-			availableProducts[product.id]?.info = product.info ?? current.info
-			availableProducts[product.id]?.product = product.product ?? current.product
-			availableProducts[product.id]?.product2 = product.product2 ?? current.product2
-			availableProducts[product.id]?.recentPurchaseDate = product.recentPurchaseDate ?? current.recentPurchaseDate
-			availableProducts[product.id]?.recentTransactionID = product.recentTransactionID ?? current.recentTransactionID
-			availableProducts[product.id]?.expirationDate = product.expirationDate ?? current.expirationDate
-			availableProducts[product.id]?.onDeviceExpirationDate = product.onDeviceExpirationDate ?? current.onDeviceExpirationDate
+		let id = product.id
+		if !allProductIDs.contains(id) { allProductIDs.append(id) }
+		if var current = availableProducts[id] {
+			current.info = product.info ?? current.info
+			current.product = product.product ?? current.product
+			current.product2 = product.product2 ?? current.product2
+			current.recentPurchaseDate = product.recentPurchaseDate ?? current.recentPurchaseDate
+			current.recentTransactionID = product.recentTransactionID ?? current.recentTransactionID
+			current.expirationDate = product.expirationDate ?? current.expirationDate
+			current.onDeviceExpirationDate = product.onDeviceExpirationDate ?? current.onDeviceExpirationDate
+			
+			availableProducts[id] = current
 		} else {
-			availableProducts[product.id] = product
+			availableProducts[id] = product
 		}
 	}
 	

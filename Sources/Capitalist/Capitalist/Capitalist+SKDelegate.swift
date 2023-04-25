@@ -70,9 +70,7 @@ extension Capitalist {
 		self.purchaseQueue.suspend()
 		allProductIDs = products
 		for productID in products {
-			if availableProducts[productID] == nil {
-				addAvailableProduct(Product(product: nil, id: productID, info: nil))
-			}
+			addAvailableProduct(Product(product: nil, id: productID, info: nil))
 		}
 		
 		productsRequest = ProductFetcher(ids: products, useStoreKit2: useStoreKit2) { result in

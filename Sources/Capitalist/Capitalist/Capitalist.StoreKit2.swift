@@ -37,9 +37,11 @@ extension Capitalist {
 				switch result {
 				case .verified(let transaction):
 					self.recordPurchase(of: transaction.capitalistProduct, at: transaction.purchaseDate, expirationDate: transaction.expirationDate, restored: true, transactionID: "\(transaction.id)", originalTransactionID: "\(transaction.originalID)")
+					await transaction.finish()
 
 				case .unverified(let unverTransaction, let error):
 					print("Got an unverified transaction from StoreKit: \(unverTransaction), \(error)")
+					await unverTransaction.finish()
 				}
 			}
 		}
