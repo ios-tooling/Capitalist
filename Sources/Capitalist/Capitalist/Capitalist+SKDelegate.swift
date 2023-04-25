@@ -84,7 +84,7 @@ extension Capitalist {
 			case .success:
 				self.state = .idle
 				
-				self.receipt.updateCachedReceipt(label: "Product Request Completed")
+				self.receipt?.updateCachedReceipt(label: "Product Request Completed")
 				NotificationCenter.default.post(name: Notifications.didFetchProducts, object: nil)
 				self.delegate?.didFetchProducts()
 				DispatchQueue.main.async { self.objectChanged() }

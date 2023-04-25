@@ -19,7 +19,7 @@ import Combine
 public struct ReceiptView: View {
 	public init() { }
 	func copyReceipt() {
-		UIPasteboard.general.string = Capitalist.instance.receipt.description
+		UIPasteboard.general.string = Capitalist.instance.receipt?.description
 	}
 	
 	public var body: some View {
@@ -28,7 +28,7 @@ public struct ReceiptView: View {
 				.edgesIgnoringSafeArea(.all)
 			ScrollView() {
 				VStack() {
-					Text(Capitalist.instance.receipt.description)
+					Text(Capitalist.instance.receipt?.description ?? "Missing Receipt")
 						.multilineTextAlignment(.leading)
 						.font(.custom("Courier", size: 14))
 						.onTapGesture {

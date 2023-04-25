@@ -31,7 +31,7 @@ public class Capitalist: NSObject {
 	public var purchasedProducts: [Product.ID] = []
 	public var availableProducts: [Product.ID: Product] = [:]
 	public var waitingPurchases: [Product.ID] = []
-	public var receipt: Receipt!
+	public var receipt: Receipt?
 	public var cacheDecryptedReceipts = true
 	public var useSandbox = (Capitalist.distribution != .appStore && Capitalist.distribution != .testflight)
 	public var allProductIDs: [Product.ID] = []
@@ -57,7 +57,7 @@ public class Capitalist: NSObject {
 	internal var productsRequest: ProductFetcher?
 	internal var pendingProducts: [Product.ID]?
 	
-	public var currentReceiptData: Data? { receipt.receiptData }
+	public var currentReceiptData: Data? { receipt?.receiptData }
 	
 	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false, validatingReceiptWithServer: Bool = true, receiptOverride: ReceiptOverride? = nil, useStoreKit2: Bool = true) {
 		if isSetup {
@@ -65,6 +65,7 @@ public class Capitalist: NSObject {
 			return
 		}
 		
+		receipt = Receipt(validating: validatingReceiptWithServer)
 		if #available(iOS 15, macOS 12, *), useStoreKit2 {
 			self.useStoreKit2 = true
 			startStoreKit2Listener()
@@ -75,7 +76,6 @@ public class Capitalist: NSObject {
 		SKPaymentQueue.default().add(self)
 		Capitalist.Receipt.appSpecificSharedSecret = secret
 		allProductIDs = productIDs
-		receipt = Receipt(validating: validatingReceiptWithServer)
 		requestProducts()
 		if refreshReceipt { checkForPurchases() }
 	}
@@ -87,7 +87,7 @@ public class Capitalist: NSObject {
 	}
 	
 	public func checkForPurchases() {
-		self.receipt.refresh()
+		self.receipt?.refresh()
 	}
 	
 	@available(iOS 14.0, *)
@@ -134,7 +134,7 @@ public class Capitalist: NSObject {
 	
 	public func restorePurchases(justUsingReceipt: Bool = true) {
 		if justUsingReceipt {
-			self.receipt.refresh()
+			self.receipt?.refresh()
 		} else {
 			SKPaymentQueue.default().restoreCompletedTransactions()
 		}
@@ -161,7 +161,6 @@ public class Capitalist: NSObject {
 	}
 	
 	func _addAvailableProduct(_ product: Capitalist.Product) {
-		
 		if !allProductIDs.contains(product.id) { allProductIDs.append(product.id) }
 
 		if let current = availableProducts[product.id] {
@@ -193,6 +192,10 @@ public class Capitalist: NSObject {
 	}
 	
 	func recordPurchase(of product: Product, at date: Date?, expirationDate: Date?, restored: Bool, transactionID: String?, originalTransactionID: String?) {
+		guard let receipt else {
+			print("Receipt is not yet configured, did you call Capitalist.setup() first?")
+			return
+		}
 		if !purchasedProducts.contains(product.id) || product.id.kind == .consumable { self.purchasedProducts.append(product.id) }
 		
 		if let purchasedAt = date {
@@ -217,7 +220,7 @@ public class Capitalist: NSObject {
 		availableProducts[product.id]?.recentTransactionID = transactionID
 		self.purchaseCompletion = nil
 		
-		self.receipt.loadBundleReceipt { error in
+		receipt.loadBundleReceipt { error in
 			if let err = error {
 				print("Error when loading local receipt: \(err)")
 			} else {
@@ -228,7 +231,7 @@ public class Capitalist: NSObject {
 				#if targetEnvironment(simulator)
 					self.saveLocalExpirationDate(for: purchased)
 				#else
-					if self.receipt.receiptDecodeFailed {
+					if receipt.receiptDecodeFailed {
 						self.saveLocalExpirationDate(for: purchased)
 					} else {
 						self.clearLocalExpirationDate(for: purchased)

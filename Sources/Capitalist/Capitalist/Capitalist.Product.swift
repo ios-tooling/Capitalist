@@ -295,7 +295,7 @@ extension Capitalist {
 			let state = self.subscriptionState
 			
 			if state.isExpired {
-				Capitalist.instance.receipt.refresh() { error in completion(self.subscriptionState) }
+				Capitalist.instance.receipt?.refresh() { error in completion(self.subscriptionState) }
 			} else {
 				completion(self.subscriptionState)
 			}
