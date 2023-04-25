@@ -67,7 +67,7 @@ extension Capitalist {
 							
 						case .verified(let transaction):
 							print("Success! \(transaction)")
-							self.recordPurchase(of: product, at: transaction.purchaseDate, expirationDate: transaction.expirationDate, restored: false)
+							self.recordPurchase(of: product, at: transaction.purchaseDate, expirationDate: transaction.expirationDate, restored: false, transactionID: "\(transaction.id)", originalTransactionID: "\(transaction.originalID)")
 							completion?(product, nil)
 						}
 						
@@ -115,7 +115,7 @@ extension Capitalist {
 				DispatchQueue.main.async {
 					self.purchaseCompletion?(product, nil)
 					NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: product, userInfo: Notification.purchaseFlagsDict(.prepurchased))
-					self.delegate?.didPurchase(product: product, flags: .prepurchased)
+					self.delegate?.didPurchase(product: product, details: PurchaseDetails(flags: .prepurchased, transactionID: product.recentTransactionID, originalTransactionID: nil, expirationDate: product.expirationDate))
 					self.state = .idle
 				}
 				return

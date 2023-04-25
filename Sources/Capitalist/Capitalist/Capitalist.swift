@@ -7,9 +7,16 @@ import StoreKit
 
 /// Call Capitalist.instance.setup(with: Secret, productIDs: [Product IDs]) in AppDelegate.didFinishLaunching
 
+public struct PurchaseDetails {
+	public let flags: Capitalist.PurchaseFlag
+	public let transactionID: String?
+	public let originalTransactionID: String?
+	public let expirationDate: Date?
+}
+
 public protocol CapitalistDelegate: AnyObject {
 	func didFetchProducts()
-	func didPurchase(product: Capitalist.Product, flags: Capitalist.PurchaseFlag)
+	func didPurchase(product: Capitalist.Product, details: PurchaseDetails)
 	func didFailToPurchase(productID: Capitalist.Product.ID, error: Error)
 }
 
@@ -140,14 +147,37 @@ public class Capitalist: NSObject {
 	
 	public subscript(string: String?) -> Product? {
 		guard let id = productID(from: string) else { return nil }
-		return availableProducts[id]
+		return self[id]
 	}
 	
 	public func productID(from string: String?) -> Product.ID? {
 		return self.allProductIDs.filter({ $0.rawValue == string }).first
 	}
 	
-	public func isProductAvailable(_ id: Product.ID) -> Bool { availableProducts[id] != nil }
+	func addAvailableProduct(_ product: Capitalist.Product?) {
+		guard let product else { return }
+		
+		processingQueue.async { self._addAvailableProduct(product) }
+	}
+	
+	func _addAvailableProduct(_ product: Capitalist.Product) {
+		
+		if !allProductIDs.contains(product.id) { allProductIDs.append(product.id) }
+
+		if let current = availableProducts[product.id] {
+			availableProducts[product.id]?.info = product.info ?? current.info
+			availableProducts[product.id]?.product = product.product ?? current.product
+			availableProducts[product.id]?.product2 = product.product2 ?? current.product2
+			availableProducts[product.id]?.recentPurchaseDate = product.recentPurchaseDate ?? current.recentPurchaseDate
+			availableProducts[product.id]?.recentTransactionID = product.recentTransactionID ?? current.recentTransactionID
+			availableProducts[product.id]?.expirationDate = product.expirationDate ?? current.expirationDate
+			availableProducts[product.id]?.onDeviceExpirationDate = product.onDeviceExpirationDate ?? current.onDeviceExpirationDate
+		} else {
+			availableProducts[product.id] = product
+		}
+	}
+	
+	public func isProductAvailable(_ id: Product.ID) -> Bool { availableProducts[id]?.product != nil || availableProducts[id]?.product2 != nil }
 	
 	public func canPurchase(_ id: Product.ID) -> Bool {
 		if self.state != .idle, self.state != .restoring { return false }
@@ -162,7 +192,7 @@ public class Capitalist: NSObject {
 		}
 	}
 	
-	func recordPurchase(of product: Product, at date: Date?, expirationDate: Date? = nil, restored: Bool) {
+	func recordPurchase(of product: Product, at date: Date?, expirationDate: Date?, restored: Bool, transactionID: String?, originalTransactionID: String?) {
 		if !purchasedProducts.contains(product.id) || product.id.kind == .consumable { self.purchasedProducts.append(product.id) }
 		
 		if let purchasedAt = date {
@@ -173,7 +203,7 @@ public class Capitalist: NSObject {
 			case .subscription:
 				availableProducts[product.id]?.recentPurchaseDate = purchasedAt
 				availableProducts[product.id]?.expirationDate = expirationDate
-				
+				availableProducts[product.id]?.recentTransactionID = transactionID
 			default: break
 			}
 		}
@@ -184,6 +214,7 @@ public class Capitalist: NSObject {
 		
 		let completion = self.purchaseCompletion
 		let purchased = availableProducts[product.id] ?? product
+		availableProducts[product.id]?.recentTransactionID = transactionID
 		self.purchaseCompletion = nil
 		
 		self.receipt.loadBundleReceipt { error in
@@ -191,7 +222,9 @@ public class Capitalist: NSObject {
 				print("Error when loading local receipt: \(err)")
 			} else {
 				self.state = .idle
-				NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: purchased, userInfo: Notification.purchaseFlagsDict(restored ? .restored : []))
+				var dict = Notification.purchaseFlagsDict(restored ? .restored : [])
+				if let transactionID { dict["transactionID"] = transactionID }
+				NotificationCenter.default.post(name: Notifications.didPurchaseProduct, object: purchased, userInfo: dict)
 				#if targetEnvironment(simulator)
 					self.saveLocalExpirationDate(for: purchased)
 				#else
@@ -204,7 +237,7 @@ public class Capitalist: NSObject {
 			}
 			DispatchQueue.main.async {
 				completion?(purchased, nil)
-				self.delegate?.didPurchase(product: purchased, flags: restored ? .restored : [])
+				self.delegate?.didPurchase(product: purchased, details: PurchaseDetails(flags: restored ? .restored : [], transactionID: transactionID, originalTransactionID: originalTransactionID, expirationDate: expirationDate))
 				self.objectChanged()
 			}
 		}

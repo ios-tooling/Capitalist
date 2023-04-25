@@ -25,12 +25,11 @@ extension Capitalist: SKPaymentTransactionObserver {
 			switch transaction.transactionState {
 			case .purchased, .restored:
 				if let product = self[transaction.payment.productIdentifier] {
-					self.recordPurchase(of: product, at: transaction.transactionDate, restored: transaction.transactionState == .restored)
+					self.recordPurchase(of: product, at: transaction.transactionDate, expirationDate: nil, restored: transaction.transactionState == .restored, transactionID: transaction.transactionIdentifier, originalTransactionID: transaction.original?.transactionIdentifier)
 				} else {
 					if let newProduct = Capitalist.Product(product: nil, id: Product.ID(rawValue: transaction.payment.productIdentifier, kind: .notSet)) {
-						self.availableProducts[newProduct.id] = newProduct
-						self.allProductIDs.append(newProduct.id)
-						self.recordPurchase(of: newProduct, at: transaction.transactionDate, restored: transaction.transactionState == .restored)
+						self.addAvailableProduct(newProduct)
+						self.recordPurchase(of: newProduct, at: transaction.transactionDate, expirationDate: nil, restored: transaction.transactionState == .restored, transactionID: transaction.transactionIdentifier, originalTransactionID: transaction.original?.transactionIdentifier)
 					}
 				}
 				SKPaymentQueue.default().finishTransaction(transaction)

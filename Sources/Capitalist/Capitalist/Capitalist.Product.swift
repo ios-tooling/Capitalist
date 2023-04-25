@@ -156,7 +156,8 @@ extension Capitalist {
 		public let id: Capitalist.Product.ID
 		public var product: SKProduct?
 		public var product2: Any?
-		var recentPurchaseDate: Date? { didSet { updateSubscriptionInfo() }}
+		public var recentPurchaseDate: Date? { didSet { updateSubscriptionInfo() }}
+		public var recentTransactionID: String?
 		var expirationDate: Date?
 		var onDeviceExpirationDate: Date?
 		

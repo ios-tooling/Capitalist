@@ -42,7 +42,7 @@ extension Capitalist: SKRequestDelegate {
 		objectWillChange.send()
 		products.forEach {
 			if let prod = self.productID(from: $0.productIdentifier) {
-				self.availableProducts[prod] = Product(product: $0)
+				self.addAvailableProduct(Product(product: $0, id: prod))
 			}
 		}
 	}
@@ -50,7 +50,7 @@ extension Capitalist: SKRequestDelegate {
 	func load(products: [Product]) {
 		objectWillChange.send()
 		products.forEach { product in
-			self.availableProducts[product.id] = product
+			self.addAvailableProduct(product)
 		}
 	}
 }
@@ -71,7 +71,7 @@ extension Capitalist {
 		allProductIDs = products
 		for productID in products {
 			if availableProducts[productID] == nil {
-				availableProducts[productID] = Product(product: nil, id: productID, info: nil)
+				addAvailableProduct(Product(product: nil, id: productID, info: nil))
 			}
 		}
 		
