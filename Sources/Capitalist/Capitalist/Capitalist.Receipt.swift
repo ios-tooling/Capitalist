@@ -177,7 +177,7 @@ extension Capitalist {
 			
 			self.currentCheckingHash = hash
 			let dict: [String: Any] = ["receipt-data": receiptData.base64EncodedString(options: []), "password": Receipt.appSpecificSharedSecret ?? "", "exclude-old-transactions": true]
-			let useSandbox = false//Capitalist.instance.useSandbox
+			let useSandbox = Capitalist.instance.useSandbox
 			let url = URL(string: "https://\(useSandbox ? "sandbox" : "buy").itunes.apple.com/verifyReceipt")!
 			var request = URLRequest(url: url)
 			request.httpBody = try! JSONSerialization.data(withJSONObject: dict, options: [])
