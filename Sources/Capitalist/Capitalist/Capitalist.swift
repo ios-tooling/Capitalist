@@ -77,6 +77,7 @@ public class Capitalist: NSObject {
 		Capitalist.Receipt.appSpecificSharedSecret = secret
 		allProductIDs = productIDs
 		requestProducts()
+		receipt?.loadBundleReceipt()
 		if refreshReceipt { checkForPurchases() }
 	}
 	
