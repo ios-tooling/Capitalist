@@ -17,7 +17,7 @@ extension Capitalist {
 			"\(id): \(date.description)"
 		}
 	}
-	public func currentExpirationDateAndProduct(for productIDs: [Product.ID] = Capitalist.instance.allProductIDs) -> ProductExpiration? {
+	public func currentExpirationDateAndProduct(for productIDs: [Product.ID] = Capitalist.instance.availableProductIDs) -> ProductExpiration? {
 		var result: ProductExpiration?
 		
 		for id in productIDs {
@@ -29,7 +29,7 @@ extension Capitalist {
 		return result
 	}
 
-	public func currentExpirationDate(for productIDs: [Product.ID] = Capitalist.instance.allProductIDs) -> Date? {
+	public func currentExpirationDate(for productIDs: [Product.ID] = Capitalist.instance.availableProductIDs) -> Date? {
 		if let date = currentExpirationDateAndProduct(for: productIDs)?.date { return date }
 		
 		for id in productIDs {

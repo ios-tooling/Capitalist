@@ -35,6 +35,7 @@ public class Capitalist: NSObject {
 	public var cacheDecryptedReceipts = true
 	public var useSandbox = (Capitalist.distribution != .appStore && Capitalist.distribution != .testflight)
 	public var allProductIDs: [Product.ID] = []
+	public var availableProductIDs: [Product.ID] { Array(availableProducts.keys) }
 	public var purchaseTimeOut: TimeInterval = 120
 	public var purchasedConsumables: [ConsumablePurchase] = []
 	public var loggingOn = false
@@ -106,14 +107,14 @@ public class Capitalist: NSObject {
 		if let prod = product {
 			return self.waitingPurchases.contains(prod)
 		} else {
-			let productIDs = products ?? self.allProductIDs
+			let productIDs = products ?? (allProductIDs + availableProductIDs)
 			for prod in productIDs { if self.waitingPurchases.contains(prod) { return true } }
 		}
 		return false
 	}
 	
 	public func subscriptionState(of products: [Product.ID]? = nil) -> Product.SubscriptionState {
-		let productIDs = products ?? self.allProductIDs
+		let productIDs = products ?? availableProductIDs
 		
 		if let validUntil = self.currentExpirationDate(for: productIDs) {
 			if validUntil > Date() {
@@ -152,7 +153,7 @@ public class Capitalist: NSObject {
 	}
 	
 	public func productID(from string: String?) -> Product.ID? {
-		return self.allProductIDs.filter({ $0.rawValue == string }).first
+		return (availableProductIDs + allProductIDs).filter({ $0.rawValue == string }).first
 	}
 	
 	func addAvailableProduct(_ product: Capitalist.Product?) {
