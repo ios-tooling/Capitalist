@@ -47,7 +47,10 @@ extension Capitalist {
 			public var description: String { return self.rawValue }
 			public let isPrepurchased: Bool
 			public let subscriptionDuration: SubscriptionDuration?
-
+			public static func ==(lhs: Self, rhs: Self) -> Bool {
+				lhs.rawValue == rhs.rawValue
+			}
+			
 			var isValid: Bool { return !self.rawValue.isEmpty }
 			
 			static let none = ID(rawValue: "", kind: .none)
