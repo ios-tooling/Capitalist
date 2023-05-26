@@ -50,6 +50,9 @@ extension Capitalist {
 			public static func ==(lhs: Self, rhs: Self) -> Bool {
 				lhs.rawValue == rhs.rawValue
 			}
+			public func hash(into hasher: inout Hasher) {
+				hasher.combine(rawValue)
+			}
 			
 			var isValid: Bool { return !self.rawValue.isEmpty }
 			
