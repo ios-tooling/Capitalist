@@ -425,3 +425,10 @@ fileprivate extension String {
 		Capitalist.instance.productID(from: self)
 	}
 }
+
+extension Array where Element == Capitalist.Product.ID {
+	func contains(_ productID: String) -> Bool {
+		return self.firstIndex(where: { $0.rawValue == productID }) != nil
+	}
+}
+

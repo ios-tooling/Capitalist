@@ -72,7 +72,7 @@ extension Capitalist {
 		}
 	}
 	
-	public class Receipt: NSObject {
+	public class Receipt: CustomStringConvertible {
 		public static var appSpecificSharedSecret: String!			//this should be found in AppStoreConnect
 		public var isRefreshing = false
 		public var isValidating = false
@@ -84,15 +84,13 @@ extension Capitalist {
 		public var hasCheckedReceipt = false
 
 		var refreshCompletions: [(Error?) -> Void] = []
-		public override var description: String {
+		public var description: String {
 			if let cached = cachedReciept { return cached.description }
 			if let serverResponse = serverResponse { return serverResponse }
 			return "No Cached Receipt"
 		}
 		
-		init(validating: Bool) {
-			super.init()
-			shouldValidateWithServer = validating
+		init() {
 			do {
 				if let data = lastValidReceiptData, let receipt = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
 					self.updateCachedReceipt(label: "Setup", receipt: receipt)
@@ -249,40 +247,6 @@ extension Capitalist {
 			}
 			get { try? Data(contentsOf: lastValidReceiptDataURL) }
 		}
-	}
-}
-
-extension Capitalist.Receipt: SKRequestDelegate {
-	public func requestDidFinish(_ request: SKRequest) {
-		self.isRefreshing = false
-		if request is SKReceiptRefreshRequest {
-			if Capitalist.instance.loggingOn { print("Refresh Receipt Completed") }
-			loadBundleReceipt()
-		}
-	}
-	
-	public func request(_ request: SKRequest, didFailWithError error: Error) {
-		self.isRefreshing = false
-		self.callRefreshCompletions(with: error)
-		if request is SKReceiptRefreshRequest, (error as NSError).code == 100 {
-			print("***** Make sure your test user is from the correct AppStoreConnect account. *****")
-		} else {
-			print("Error when loading \(request): \(error.localizedDescription)")
-		}
-	}
-	
-	func callRefreshCompletions(with error: Error?) {
-		let comps = self.refreshCompletions
-		self.refreshCompletions = []
-		DispatchQueue.main.async {
-			comps.forEach { $0(error) }
-		}
-	}
-}
-
-extension Array where Element == Capitalist.Product.ID {
-	func contains(_ productID: String) -> Bool {
-		return self.firstIndex(where: { $0.rawValue == productID }) != nil
 	}
 }
 

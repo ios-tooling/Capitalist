@@ -7,23 +7,6 @@ import StoreKit
 
 /// Call Capitalist.instance.setup(with: Secret, productIDs: [Product IDs]) in AppDelegate.didFinishLaunching
 
-public struct PurchaseDetails {
-	public let flags: Capitalist.PurchaseFlag
-	public let transactionID: String?
-	public let originalTransactionID: String?
-	public let expirationDate: Date?
-}
-
-public protocol CapitalistDelegate: AnyObject {
-	func didFetchProducts()
-	func didPurchase(product: Capitalist.Product, details: PurchaseDetails)
-	func didFailToPurchase(productID: Capitalist.Product.ID, error: Error)
-}
-
-public protocol CapitalistReceiptDelegate: AnyObject {
-	func didDecodeReceipt()
-}
-
 public class Capitalist: NSObject {
 	public static let instance = Capitalist()
 	private override init() { super.init() }
@@ -60,13 +43,13 @@ public class Capitalist: NSObject {
 	
 	public var currentReceiptData: Data? { receipt?.receiptData }
 	
-	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false, validatingReceiptWithServer: Bool = true, receiptOverride: ReceiptOverride? = nil, useStoreKit2: Bool = true) {
+	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false, receiptOverride: ReceiptOverride? = nil) {
 		if isSetup {
 			print("Capitalist.setup() should only be called once.")
 			return
 		}
 		
-		receipt = Receipt(validating: validatingReceiptWithServer)
+		receipt = Receipt()
 		if #available(iOS 15, macOS 12, *), useStoreKit2 {
 			self.useStoreKit2 = true
 			startStoreKit2Listener()
