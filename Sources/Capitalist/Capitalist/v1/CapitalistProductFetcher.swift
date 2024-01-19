@@ -10,13 +10,13 @@ import StoreKit
 
 
 extension Capitalist {
-	public class ProductFetcher: NSObject, SKProductsRequestDelegate {
-		public typealias ProductCompletion = (Result<[Product], Error>) -> Void
+	internal class ProductFetcher: NSObject, SKProductsRequestDelegate {
+		internal typealias ProductCompletion = (Result<[Product], Error>) -> Void
 		var completion: ProductCompletion?
 		var request: SKProductsRequest!
 		let useStoreKit2: Bool
 		
-		public init(ids: [Capitalist.Product.ID], useStoreKit2: Bool, completion: @escaping ProductCompletion) {
+		internal init(ids: [Capitalist.Product.ID], useStoreKit2: Bool, completion: @escaping ProductCompletion) {
 			self.useStoreKit2 = useStoreKit2
 			super.init()
 			self.fetch(ids: ids, completion: completion)
@@ -52,7 +52,7 @@ extension Capitalist {
 			}
 		}
 
-		public func productsRequest(_ request: SKProductsRequest, didReceive response: SKProductsResponse) {
+		internal func productsRequest(_ request: SKProductsRequest, didReceive response: SKProductsResponse) {
 			Capitalist.instance.load(products: response.products)
 			
 			if response.products.isEmpty {
@@ -64,13 +64,13 @@ extension Capitalist {
 			completion = nil
 		}
 		
-		public func request(_ request: SKRequest, didFailWithError error: Error) {
+		internal func request(_ request: SKRequest, didFailWithError error: Error) {
 			completion?(.failure(error))
 			request.delegate = nil
 			completion = nil
 		}
 		
-		public func requestDidFinish(_ request: SKRequest) {
+		internal func requestDidFinish(_ request: SKRequest) {
 			completion?(.success([]))
 			request.delegate = nil
 			completion = nil

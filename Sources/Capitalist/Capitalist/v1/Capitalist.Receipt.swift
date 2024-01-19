@@ -17,7 +17,7 @@ extension Capitalist {
 			"\(id): \(date.description)"
 		}
 	}
-	public func currentExpirationDateAndProduct(for productIDs: [Product.ID] = Capitalist.instance.availableProductIDs) -> ProductExpiration? {
+	internal func currentExpirationDateAndProduct(for productIDs: [Product.ID] = Capitalist.instance.availableProductIDs) -> ProductExpiration? {
 		var result: ProductExpiration?
 		
 		for id in productIDs {
@@ -29,7 +29,7 @@ extension Capitalist {
 		return result
 	}
 
-	public func currentExpirationDate(for productIDs: [Product.ID] = Capitalist.instance.availableProductIDs) -> Date? {
+	internal func currentExpirationDate(for productIDs: [Product.ID] = Capitalist.instance.availableProductIDs) -> Date? {
 		if let date = currentExpirationDateAndProduct(for: productIDs)?.date { return date }
 		
 		for id in productIDs {
@@ -40,11 +40,11 @@ extension Capitalist {
 		return nil
 	}
 	
-	public func isInTrial(for productIDs: [Product.ID]) -> Bool {
+	internal func isInTrial(for productIDs: [Product.ID]) -> Bool {
 		return self.availableProducts.values.filter({ productIDs.contains($0.id) && $0.isInTrialPeriod }).count > 0
 	}
 	
-	public func hasUsedTrial(for productIDs: [Product.ID]) -> Bool {
+	internal func hasUsedTrial(for productIDs: [Product.ID]) -> Bool {
 		return self.availableProducts.values.filter({ productIDs.contains($0.id) && $0.hasUsedTrial }).count > 0
 	}
 	
@@ -68,23 +68,23 @@ extension Capitalist {
 				}
 			}
 			self.hasSales = receipts.count > 0
-			Capitalist.instance.objectChanged()
+			Capitalist.instance.objectWillChange.send()
 		}
 	}
 	
-	public class Receipt: CustomStringConvertible {
-		public static var appSpecificSharedSecret: String!			//this should be found in AppStoreConnect
-		public var isRefreshing = false
-		public var isValidating = false
-		public var cachedReciept: [String: Any]?
+	internal class Receipt: CustomStringConvertible {
+		internal static var appSpecificSharedSecret: String!			//this should be found in AppStoreConnect
+		internal var isRefreshing = false
+		internal var isValidating = false
+		internal var cachedReciept: [String: Any]?
 		var currentCheckingHash: Int?
 		var shouldValidateWithServer = true
 		var serverResponse: String?
-		public var receiptDecodeFailed = false
-		public var hasCheckedReceipt = false
+		internal var receiptDecodeFailed = false
+		internal var hasCheckedReceipt = false
 
 		var refreshCompletions: [(Error?) -> Void] = []
-		public var description: String {
+		internal var description: String {
 			if let cached = cachedReciept { return cached.description }
 			if let serverResponse = serverResponse { return serverResponse }
 			return "No Cached Receipt"
@@ -101,7 +101,7 @@ extension Capitalist {
 			}
 		}
 		
-		public func refresh(completion: CapitalistErrorCallback? = nil) {
+		internal func refresh(completion: CapitalistErrorCallback? = nil) {
 			if let comp = completion { self.refreshCompletions.append(comp) }
 			
 			if self.isRefreshing { return }
@@ -109,7 +109,7 @@ extension Capitalist {
 			let op = SKReceiptRefreshRequest(receiptProperties: nil)
 			self.isRefreshing = true
 
-			op.delegate = self
+			//op.delegate = self
 			op.start()
 		}
 		
@@ -225,7 +225,7 @@ extension Capitalist {
 		
 		func callValidationCompletions() {
 			hasCheckedReceipt = true
-			callRefreshCompletions(with: nil)
+			//callRefreshCompletions(with: nil)
 			let completions = self.validationCompletions
 			self.currentCheckingHash = nil
 			self.validationCompletions = []
@@ -239,11 +239,7 @@ extension Capitalist {
 		
 		var lastValidReceiptData: Data? {
 			set {
-				if !Capitalist.instance.cacheDecryptedReceipts || newValue == nil {
-					try? FileManager.default.removeItem(at: lastValidReceiptDataURL)
-				} else {
-					try? newValue?.write(to: lastValidReceiptDataURL)
-				}
+				try? newValue?.write(to: lastValidReceiptDataURL)
 			}
 			get { try? Data(contentsOf: lastValidReceiptDataURL) }
 		}

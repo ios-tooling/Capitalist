@@ -7,15 +7,14 @@ import StoreKit
 
 /// Call Capitalist.instance.setup(with: Secret, productIDs: [Product IDs]) in AppDelegate.didFinishLaunching
 
-public class Capitalist: NSObject {
+public class Capitalist: ObservableObject {
 	public static let instance = Capitalist()
-	private override init() { super.init() }
+	private init() {  }
 	
+	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
 	public var purchasedProducts: [Product.ID] = []
 	public var availableProducts: [Product.ID: Product] = [:]
 	public var waitingPurchases: [Product.ID] = []
-	public var receipt: Receipt?
-	public var cacheDecryptedReceipts = true
 	public var useSandbox = (Capitalist.distribution != .appStore && Capitalist.distribution != .testflight)
 	public var allProductIDs: [Product.ID] = []
 	public var availableProductIDs: [Product.ID] { Array(availableProducts.keys) }
@@ -23,14 +22,14 @@ public class Capitalist: NSObject {
 	public var purchasedConsumables: [ConsumablePurchase] = []
 	public var loggingOn = false
 	public var subscriptionManagementURL = URL(string: "https://finance-app.itunes.apple.com/account/subscriptions")!
-	public var productFetchError: Error?
-	public var reportedError: Error? { didSet { self.objectChanged() }}
+	public var reportedError: Error? { didSet { self.objectWillChange.send() }}
 	public var receiptOverride: ReceiptOverride?
-	public var hasSales = false
-	public var storeExpirationDatesInDefaults = false
-	public var useStoreKit2 = false
 
-	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
+	internal var hasSales = false
+	internal var storeExpirationDatesInDefaults = false
+	internal var useStoreKit2 = false
+	internal var receipt: Receipt?
+
 	
 	weak var delegate: CapitalistDelegate?
 	private var isSetup = false
@@ -41,7 +40,7 @@ public class Capitalist: NSObject {
 	internal var productsRequest: ProductFetcher?
 	internal var pendingProducts: [Product.ID]?
 	
-	public var currentReceiptData: Data? { receipt?.receiptData }
+	internal var currentReceiptData: Data? { receipt?.receiptData }
 	
 	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false, receiptOverride: ReceiptOverride? = nil) {
 		if isSetup {
@@ -57,7 +56,6 @@ public class Capitalist: NSObject {
 		if let over = receiptOverride { self.receiptOverride = over }
 		isSetup = true
 		self.delegate = delegate
-		SKPaymentQueue.default().add(self)
 		Capitalist.Receipt.appSpecificSharedSecret = secret
 		allProductIDs = productIDs
 		requestProducts()
@@ -228,31 +226,8 @@ public class Capitalist: NSObject {
 			DispatchQueue.main.async {
 				completion?(purchased, nil)
 				self.delegate?.didPurchase(product: purchased, details: PurchaseDetails(flags: restored ? .restored : [], transactionID: transactionID, originalTransactionID: originalTransactionID, expirationDate: expirationDate))
-				self.objectChanged()
+				self.objectWillChange.send()
 			}
 		}
 	}
 }
-
-#if canImport(Combine)
-
-	@available(OSX 10.15, iOS 13.0, tvOS 13, watchOS 6, *)
-	extension Capitalist: ObservableObject {
-	}
-
-	extension Capitalist {
-		 func objectChanged() {
-			  if #available(OSX 10.15, iOS 13.0, tvOS 13, watchOS 6, *) {
-				  if Thread.isMainThread {
-					  objectWillChange.send()
-				  } else {
-					  Task { await MainActor.run { objectWillChange.send() }}
-				  }
-			  }
-		 }
-	}
-#else
-extension Capitalist {
-	func objectChanged() { }
-}
-#endif

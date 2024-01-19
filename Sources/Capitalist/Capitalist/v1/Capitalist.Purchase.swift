@@ -9,7 +9,7 @@ import Foundation
 import StoreKit
 
 extension Capitalist {
-	public func purchase(_ id: Product.ID) async throws -> Product {		
+	internal func purchase(_ id: Product.ID) async throws -> Product {
 		let product: Product = try await withCheckedThrowingContinuation { continuation in
 			self.purchase(id) { product, error in
 				if let product {
@@ -33,7 +33,7 @@ extension Capitalist {
 	}
 	
 	@discardableResult
-	public func purchase(_ id: Product.ID, completion: ((Product?, Error?) -> Void)? = nil) -> Bool {
+	internal func purchase(_ id: Product.ID, completion: ((Product?, Error?) -> Void)? = nil) -> Bool {
 		guard let product = self[id] else {
 			completion?(nil, CapitalistError.productNotFound)
 			reportError(CapitalistError.productNotFound, for: id)
@@ -44,7 +44,7 @@ extension Capitalist {
 	}
 	
 	@discardableResult
-	public func purchase(_ product: Product, completion: ((Product?, Error?) -> Void)? = nil) -> Bool {
+	internal func purchase(_ product: Product, completion: ((Product?, Error?) -> Void)? = nil) -> Bool {
 		if #available(iOS 15, macOS 12, *), useStoreKit2 {
 			guard let prod = product.product2 as? StoreKit.Product else {
 				completion?(nil, CapitalistError.storeKit2ProductNotFound)

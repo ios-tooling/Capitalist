@@ -9,7 +9,7 @@ import Foundation
 import StoreKit
 
 extension Capitalist {
-	public func fetchProduct(for id: Capitalist.Product.ID, completion: @escaping (Result<SKProduct, Error>) -> Void) {
+	internal func fetchProduct(for id: Capitalist.Product.ID, completion: @escaping (Result<SKProduct, Error>) -> Void) {
 		
 	}
 }

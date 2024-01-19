@@ -7,8 +7,8 @@
 
 import StoreKit
 
-extension Capitalist: SKRequestDelegate {
-	public func requestDidFinish(_ request: SKRequest) {
+extension Capitalist {
+	internal func requestDidFinish(_ request: SKRequest) {
 		switch self.state {
 		case .restoring:
 			self.state = .idle
@@ -17,7 +17,7 @@ extension Capitalist: SKRequestDelegate {
 		}
 	}
 	
-	public func request(_ request: SKRequest, didFailWithError error: Error) {
+	internal func request(_ request: SKRequest, didFailWithError error: Error) {
 		self.reportedError = error
 		
 		switch self.state {
@@ -76,7 +76,7 @@ extension Capitalist {
 		productsRequest = ProductFetcher(ids: products, useStoreKit2: useStoreKit2) { result in
 			switch result {
 			case .failure(let err):
-				self.productFetchError = err
+				self.reportedError = err
 				print("Failed to fetch products: \(err)")
 				
 			case .success:
@@ -85,7 +85,7 @@ extension Capitalist {
 				self.receipt?.updateCachedReceipt(label: "Product Request Completed")
 				NotificationCenter.default.post(name: Notifications.didFetchProducts, object: nil)
 				self.delegate?.didFetchProducts()
-				DispatchQueue.main.async { self.objectChanged() }
+				DispatchQueue.main.async { self.objectWillChange.send() }
 			}
 			
 			self.productsRequest = nil
@@ -101,7 +101,7 @@ extension Capitalist {
 		DispatchQueue.main.async { self.purchaseQueue.resume() }
 	}
 	
-	public func logCurrentProducts(label: String) {
+	internal func logCurrentProducts(label: String) {
 		var text = label + "\n"
 		
 		for id in purchasedProducts {

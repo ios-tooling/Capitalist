@@ -7,8 +7,8 @@
 
 import StoreKit
 
-extension Capitalist: SKPaymentTransactionObserver {
-	public func clearOpenTransactions() {
+extension Capitalist {
+	internal func clearOpenTransactions() {
 		let queue = SKPaymentQueue.default()
 		let transactions = queue.transactions
 		if transactions.isEmpty { return }
@@ -20,7 +20,7 @@ extension Capitalist: SKPaymentTransactionObserver {
 		}
 	}
 	
-	public func paymentQueue(_ queue: SKPaymentQueue, updatedTransactions transactions: [SKPaymentTransaction]) {
+	internal func paymentQueue(_ queue: SKPaymentQueue, updatedTransactions transactions: [SKPaymentTransaction]) {
 		for transaction in transactions {
 			switch transaction.transactionState {
 			case .purchased, .restored:
@@ -48,7 +48,7 @@ extension Capitalist: SKPaymentTransactionObserver {
 		}
 	}
 	
-	public func paymentQueue(_ queue: SKPaymentQueue, shouldAddStorePayment payment: SKPayment, for product: SKProduct) -> Bool {
+	internal func paymentQueue(_ queue: SKPaymentQueue, shouldAddStorePayment payment: SKPayment, for product: SKProduct) -> Bool {
 		true
 	}
 	
