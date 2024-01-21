@@ -8,45 +8,14 @@ import StoreKit
 // https://developer.apple.com/app-store/subscriptions/ 
 
 extension Capitalist {
-	public func purchasePhase(of product: Product.ID) -> ProductPurchsePhase {
-		if product.isPrepurchased { return .prepurchased }
-		if self.isPurchasing(product) { return .purchasing }
-		if self.hasPurchased(product) { return .purchased }
-		return .idle
-	}
-	
-	public enum SubscriptionDuration { case oneWeek, twoWeeks, threeWeeks, oneMonth, twoMonths, threeMonths, sixMonths, oneYear
-		func expiration(startingAt: Date) -> Date {
-			var components = DateComponents()
-			
-			switch self {
-			case .oneWeek: components.day = 7
-			case .twoWeeks: components.day = 14
-			case .threeWeeks: components.day = 21
-			case .oneMonth: components.month = 1
-			case .twoMonths: components.month = 2
-			case .threeMonths: components.month = 3
-			case .sixMonths: components.month = 6
-			case .oneYear: components.year = 1
-			}
-			
-			if let date = Calendar.current.date(byAdding: components, to: startingAt) {
-				return date
-			}
-			
-			return startingAt
-		}
-	}
-	
 	public struct Product: CustomStringConvertible, Equatable {
 		public struct ID: Equatable, Hashable, CustomStringConvertible {
-			public enum Kind: String { case none, nonConsumable, consumable, subscription, notSet }
-			
 			public let rawValue: String
-			public let kind: Kind
+			public var storeKitProduct: StoreKit.Product?
 			public var description: String { return self.rawValue }
 			public let isPrepurchased: Bool
 			public let subscriptionDuration: SubscriptionDuration?
+			
 			public static func ==(lhs: Self, rhs: Self) -> Bool {
 				lhs.rawValue == rhs.rawValue
 			}
@@ -56,88 +25,66 @@ extension Capitalist {
 			
 			var isValid: Bool { return !self.rawValue.isEmpty }
 			
-			static let none = ID(rawValue: "", kind: .none)
+			static let none = ID(rawValue: "NO PRODUCT")
 			
-			public init(rawValue: String, kind: Kind, isPrepurchased: Bool = false, subscriptionDuration: SubscriptionDuration? = nil) {
+			public init(rawValue: String, isPrepurchased: Bool = false, subscriptionDuration: SubscriptionDuration? = nil) {
 				self.rawValue = rawValue
-				self.kind = kind
 				self.isPrepurchased = isPrepurchased
 				self.subscriptionDuration = subscriptionDuration
 			}
 		}
 		
-		public init?(product: SKProduct?, id localID: ID? = nil, info: [String: Any]? = nil) {
-			guard let id = localID ?? product?.productIdentifier.capitalistProductID else {
-				self.id = .none
-				return nil
-			}
+		public var info: [String: Any]?
+		public var kind: StoreKit.Product.ProductType { product?.type ?? .consumable }
+		public let id: Capitalist.Product.ID
+		let storeKitProductID: String
+		public var product: StoreKit.Product?
+		public var recentPurchaseDate: Date? { didSet { updateSubscriptionInfo() }}
+		public var recentTransactionID: String?
+		var expirationDate: Date?
+		var onDeviceExpirationDate: Date?
+
+		
+		public init?(product: StoreKit.Product, id localID: ID? = nil, info: [String: Any]? = nil) {
+			guard let id = localID ?? product.id.capitalistProductID else { return nil }
+
 			self.info = info
 			self.id = id
 			self.product = product
+			storeKitProductID = product.id
 		}
-		
-		@available(iOS 15.0, macOS 12.0, *)
-		public init?(product: StoreKit.Product, info: [String: Any]? = nil) {
-			guard let capProd = Capitalist.instance[product.id] else { return nil }
+
+		public init?(storeKitProductID: String, id localID: ID? = nil, info: [String: Any]? = nil) {
+			guard let capProd = Capitalist.instance[storeKitProductID] else { return nil }
 			self.info = info
 			self.id = capProd.id
-			self.product2 = product
+			self.storeKitProductID = storeKitProductID
 		}
 		
 		public var introductoryPrice: String? {
-			if #available(iOS 11.2, OSX 10.13.2, *) {
-				guard let price = product?.introductoryPrice?.price as? Double else { return nil }
-				return String(format: "$%.02f", price)
-			} else {
-				return nil
+			product?.subscription?.introductoryOffer?.displayPrice
+		}
+		
+		public var freeTrialDays: Int? {
+			guard let count = product?.subscription?.introductoryOffer?.periodCount, let unit = product?.subscription?.introductoryOffer?.period.unit else { return nil }
+			
+			return switch unit {
+			case .day: count
+			case .week: count * 7
+			case .month: count * 30
+			case .year: count * 365
+			@unknown default: nil
 			}
 		}
 		
-		@available(OSX 10.13.2, iOS 11.2, *)
-		public var freeTrialDays: Int? {
-			if #available(iOS 15.0, macOS 12.0, *) {
-				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
-					print("Need to calculate freeTrialDays for StoreKit2: \(prod)")
-				}
-			}
-
-			guard let intro = self.product?.introductoryPrice, intro.paymentMode == .freeTrial else { return nil }
-			
-			let count = intro.subscriptionPeriod.numberOfUnits
-			switch intro.subscriptionPeriod.unit {
-			case .day: return count
-			case .week: return count * 7
-			case .month: return count * 30
-			case .year: return count * 365
-			default: return nil
-			}
+		public var freeTrialDurationDescription: String? { .init(product?.subscription?.introductoryOffer?.period)
 		}
-
-		@available(OSX 10.13.2, iOS 11.2, *)
-		public var freeTrialDurationDescription: String? {
-			if #available(iOS 15.0, macOS 12.0, *) {
-				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
-					print("Need to calculate freeTrialDurationDescription for StoreKit2: \(prod)")
-				}
-			}
-
-			guard let intro = self.product?.introductoryPrice, intro.paymentMode == .freeTrial else { return nil }
-			
-			let count = intro.subscriptionPeriod.numberOfUnits
-			switch intro.subscriptionPeriod.unit {
-			case .day: return count == 1 ? NSLocalizedString("1 day", comment: "1 day trial") : String(format: NSLocalizedString("%d days", comment: "Trial duration in days"), count)
-			case .week: return count == 1 ? NSLocalizedString("1 day", comment: "1 day trial") :  String(format: NSLocalizedString("%d weeks", comment: "Trial duration in weeks"), count)
-			case .month: return count == 1 ? NSLocalizedString("1 day", comment: "1 day trial") :  String(format: NSLocalizedString("%d months", comment: "Trial duration in months"), count)
-			case .year: return count == 1 ? NSLocalizedString("1 day", comment: "1 day trial") :  String(format: NSLocalizedString("%d years", comment: "Trial duration in years"), count)
-			default: return nil
-			}
-		}
-
+		
 		public var description: String {
-			var text = self.id.rawValue + " - " + self.id.kind.rawValue
+			var text = self.id.rawValue + " - " + self.kind.rawValue
 			if let reason = self.expirationReason { text += ", Expired: \(reason)" }
 			if #available(iOS 11.2, OSX 10.13.2, *) {
-				if !self.hasUsedTrial, self.product?.introductoryPrice != nil { text += " can trial" }
+				if !self.hasUsedTrial, self.introductoryPrice != nil { text += " can trial" }
 			}
 			if self.isInTrialPeriod { text += " in trial" }
 			if self.isInIntroOfferPeriod { text += " in intro period" }
@@ -157,18 +104,9 @@ extension Capitalist {
 			
 			return receiptPurchaseDate > purchaseDate
 		}
-		
-		public var info: [String: Any]?
-		public let id: Capitalist.Product.ID
-		public var product: SKProduct?
-		public var product2: Any?
-		public var recentPurchaseDate: Date? { didSet { updateSubscriptionInfo() }}
-		public var recentTransactionID: String?
-		var expirationDate: Date?
-		var onDeviceExpirationDate: Date?
-		
+				
 		var isPurchaseable: Bool {
-			product != nil || product2 != nil
+			product != nil
 		}
 		
 		static let currencyFormatter: NumberFormatter = {
@@ -179,50 +117,25 @@ extension Capitalist {
 		
 		mutating func updateSubscriptionInfo() {
 			if let date = recentPurchaseDate, let expiration = self.id.subscriptionDuration?.expiration(startingAt: date) {
-				self.onDeviceExpirationDate = expiration
+				onDeviceExpirationDate = expiration
 			}
 		}
 		
 		public var expirationReason: ExpirationReason? {
-			guard let reason = self.info?["expiration_intent"] as? Int else { return nil }
+			guard let reason = info?["expiration_intent"] as? Int else { return nil }
 			return ExpirationReason(rawValue: reason)
 		}
 		
-		public var title: String? {
-			if #available(iOS 15.0, macOS 12.0, *) {
-				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
-					return prod.displayName
-				}
-			}
-			return self.product?.localizedTitle
-		}
+		public var title: String? { product?.displayName }
 		public var rawPrice: Double? {
-			if #available(iOS 15.0, macOS 12.0, *) {
-				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
-					return Double(truncating: prod.price as NSNumber)
-				}
-			}
-			return self.product?.price.doubleValue
+			guard let raw = product?.price else { return nil }
+			return Double(truncating: raw as NSNumber)
 		}
 		
-		public var price: NSDecimalNumber? {
-			if #available(iOS 15.0, macOS 12.0, *) {
-				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
-					return prod.price as NSDecimalNumber
-				}
-			}
-			return self.product?.price
-		}
-		public var localizedPrice: String? {
-			if #available(iOS 15.0, macOS 12.0, *) {
-				if Capitalist.instance.useStoreKit2, let prod = product2 as? StoreKit.Product {
-					return prod.displayPrice
-				}
-			}
-			guard let product = self.product else { return nil }
-			Self.currencyFormatter.locale = product.priceLocale
-			return Self.currencyFormatter.string(from: product.price)
-		}
+		public var price: Decimal? { product?.price }
+
+		public var localizedPrice: String? { product?.displayPrice }
+
 		public var isInBillingRetryPeriod: Bool { return Bool(any: self.info?["is_in_billing_retry_period"]) }
 		public var isInIntroOfferPeriod: Bool { return Bool(any: self.info?["is_in_intro_offer_period"]) }
 		public var isInTrialPeriod: Bool { return Bool(any: self.info?["is_trial_period"]) }
@@ -232,15 +145,7 @@ extension Capitalist {
 			
 			return recentPurchase.addingTimeInterval(duration)
 		}
-		public var subscriptionDuration: TimeInterval? {
-			if #available(iOS 11.2, macOS 10.13.2, *) {
-				guard id.kind == .subscription, let period = product?.subscriptionPeriod else { return nil }
-
-				return TimeInterval(period.numberOfUnits) * period.unit.timeInterval
-			} else {
-				return nil
-			}
-		}
+		public var subscriptionDuration: TimeInterval? { product?.subscription?.subscriptionPeriod.duration }
 		public var subscriptionExpirationDate: Date? {
 			if let expirationDate { return expirationDate }
 			guard let onDevice = onDeviceExpirationDate else { return self.date(for: "expires_date") }
@@ -262,12 +167,11 @@ extension Capitalist {
 		
 		public var quantity: Int { return Int(any: self.info?["quantity"] ?? "") }
 		public var hasPurchased: Bool {
-			switch self.id.kind {
-			case .none: return false
+			switch self.kind {
 			case .nonConsumable: return self.quantity > 0
 			case .consumable: return false
-			case .subscription: return self.subscriptionExpirationDate != nil
-			case .notSet: return false
+			case .autoRenewable: return self.subscriptionExpirationDate != nil
+			default: return false
 			}
 		}
 		
@@ -306,7 +210,7 @@ extension Capitalist {
 				completion(self.subscriptionState)
 			}
 		}
-
+		
 		public enum SubscriptionState: CustomStringConvertible { case none, purchasing, purchased, trial(Date), valid(Date), expired(Date), billingGracePeriod
 			public var isValid: Bool {
 				switch self {
@@ -338,7 +242,7 @@ extension Capitalist {
 				DateFormatter.buildPretty().string(from: date)
 			}
 		}
-
+		
 		public enum ExpirationReason: Int, CustomStringConvertible {
 			case canceled = 1, billingError, rejectedPriceIncrease, unavailable, unknown
 			public var description: String {
@@ -352,6 +256,37 @@ extension Capitalist {
 			}
 		}
 	}
+	
+	public func purchasePhase(of product: Product.ID) -> ProductPurchsePhase {
+		if product.isPrepurchased { return .prepurchased }
+		if self.isPurchasing(product) { return .purchasing }
+		if self.hasPurchased(product) { return .purchased }
+		return .idle
+	}
+	
+	public enum SubscriptionDuration { case oneWeek, twoWeeks, threeWeeks, oneMonth, twoMonths, threeMonths, sixMonths, oneYear
+		func expiration(startingAt: Date) -> Date {
+			var components = DateComponents()
+			
+			switch self {
+			case .oneWeek: components.day = 7
+			case .twoWeeks: components.day = 14
+			case .threeWeeks: components.day = 21
+			case .oneMonth: components.month = 1
+			case .twoMonths: components.month = 2
+			case .threeMonths: components.month = 3
+			case .sixMonths: components.month = 6
+			case .oneYear: components.year = 1
+			}
+			
+			if let date = Calendar.current.date(byAdding: components, to: startingAt) {
+				return date
+			}
+			
+			return startingAt
+		}
+	}
+	
 }
 
 extension DateFormatter {
@@ -395,7 +330,7 @@ extension Dictionary where Key == String {
 	}
 }
 
-extension SKProductSubscriptionPeriod {
+extension StoreKit.Product.SubscriptionPeriod {
 	func expiration(startingAt: Date) -> Date {
 		let subDuration = duration
 		let newDate = startingAt.addingTimeInterval(subDuration)
@@ -403,19 +338,18 @@ extension SKProductSubscriptionPeriod {
 	}
 	
 	var duration: TimeInterval {
-		unit.timeInterval * TimeInterval(numberOfUnits)
+		unit.timeInterval * TimeInterval(value)
 	}
 }
 
-@available(iOS 11.2, macOS 10.13.2, *)
-extension SKProduct.PeriodUnit {
+extension StoreKit.Product.SubscriptionPeriod.Unit {
 	var timeInterval: TimeInterval {
 		switch self {
-		case .day: return 1440 * 60
-		case .week: return 7 * 1440 * 60
-		case .month: return 31 * 1440 * 60
-		case .year: return 365 * 1440 * 60
-		default: return 0
+		case .day: 1440 * 60
+		case .week: 7 * 1440 * 60
+		case .month: 31 * 1440 * 60
+		case .year: 365 * 1440 * 60
+		default: 0
 		}
 	}
 }
@@ -432,3 +366,17 @@ extension Array where Element == Capitalist.Product.ID {
 	}
 }
 
+fileprivate extension String {
+	init?(_ period: Product.SubscriptionPeriod?) {
+		guard let count = period?.value, let unit = period?.unit else { return nil }
+
+		switch unit {
+		case .day: self = count == 1 ? NSLocalizedString("1 day", comment: "1 day") : String(format: NSLocalizedString("%d days", comment: "duration in days"), count)
+		case .week: self = count == 1 ? NSLocalizedString("1 day", comment: "1 day") :  String(format: NSLocalizedString("%d weeks", comment: "duration in weeks"), count)
+		case .month: self = count == 1 ? NSLocalizedString("1 day", comment: "1 day") :  String(format: NSLocalizedString("%d months", comment: "duration in months"), count)
+		case .year: self = count == 1 ? NSLocalizedString("1 day", comment: "1 day") :  String(format: NSLocalizedString("%d years", comment: "duration in years"), count)
+		default: return nil
+		}
+
+	}
+}

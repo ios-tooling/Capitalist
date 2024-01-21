@@ -37,7 +37,6 @@ public class Capitalist: ObservableObject {
 	internal let processingQueue = DispatchQueue(label: "capitalistProcessingQueue")
 	internal var purchaseCompletion: ((Product?, Error?) -> Void)?
 	internal weak var purchaseTimeOutTimer: Timer?
-	internal var productsRequest: ProductFetcher?
 	internal var pendingProducts: [Product.ID]?
 	
 	internal var currentReceiptData: Data? { receipt?.receiptData }
@@ -58,15 +57,20 @@ public class Capitalist: ObservableObject {
 		self.delegate = delegate
 		Capitalist.Receipt.appSpecificSharedSecret = secret
 		allProductIDs = productIDs
-		requestProducts()
 		receipt?.loadBundleReceipt()
 		if refreshReceipt { checkForPurchases() }
 	}
 	
-	public func update(productIDs: [Product.ID]) {
-		if Set(productIDs) == Set(allProductIDs) { return }
+	public func update(productIDs: [Product.ID]? = nil) {
+		if let productIDs, Set(productIDs) == Set(allProductIDs) { return }
 		
-		requestProducts(productIDs: productIDs)
+		Task {
+			do {
+				try await requestProducts(productIDs: productIDs)
+			} catch {
+				print("Failed to fetch products: \(error)")
+			}
+		}
 	}
 	
 	public func checkForPurchases() {
@@ -94,10 +98,10 @@ public class Capitalist: ObservableObject {
 		return false
 	}
 	
-	public func subscriptionState(of products: [Product.ID]? = nil) -> Product.SubscriptionState {
+	public func subscriptionState(of products: [Product.ID]? = nil) async -> Product.SubscriptionState {
 		let productIDs = products ?? availableProductIDs
 		
-		if let validUntil = self.currentExpirationDate(for: productIDs) {
+		if let validUntil = await currentExpirationDate(for: productIDs) {
 			if validUntil > Date() {
 				if self.isInTrial(for: productIDs) { return .trial(validUntil) }
 				return .valid(validUntil)
@@ -149,7 +153,6 @@ public class Capitalist: ObservableObject {
 		if var current = availableProducts[id] {
 			current.info = product.info ?? current.info
 			current.product = product.product ?? current.product
-			current.product2 = product.product2 ?? current.product2
 			current.recentPurchaseDate = product.recentPurchaseDate ?? current.recentPurchaseDate
 			current.recentTransactionID = product.recentTransactionID ?? current.recentTransactionID
 			current.expirationDate = product.expirationDate ?? current.expirationDate
@@ -161,18 +164,17 @@ public class Capitalist: ObservableObject {
 		}
 	}
 	
-	public func isProductAvailable(_ id: Product.ID) -> Bool { availableProducts[id]?.product != nil || availableProducts[id]?.product2 != nil }
+	public func isProductAvailable(_ id: Product.ID) -> Bool { availableProducts[id]?.product != nil }
 	
-	public func canPurchase(_ id: Product.ID) -> Bool {
+	public func canPurchase(_ id: Product.ID) async -> Bool {
 		if self.state != .idle, self.state != .restoring { return false }
 		guard !id.isPrepurchased, let product = self[id], product.isPurchaseable else { return false }
 		
-		switch product.id.kind {
-		case .consumable: return true
-		case .nonConsumable: return !self.hasPurchased(id)
-		case .subscription: return self.currentExpirationDate(for: [id]) == nil
-		case .none: return false
-		case .notSet: return false
+		return switch product.kind {
+		case .consumable: true
+		case .nonConsumable: !self.hasPurchased(id)
+		case .autoRenewable: await currentExpirationDate(for: [id]) == nil
+		default: false
 		}
 	}
 	
@@ -181,14 +183,14 @@ public class Capitalist: ObservableObject {
 			print("Receipt is not yet configured, did you call Capitalist.setup() first?")
 			return
 		}
-		if !purchasedProducts.contains(product.id) || product.id.kind == .consumable { self.purchasedProducts.append(product.id) }
+		if !purchasedProducts.contains(product.id) || product.kind == .consumable { self.purchasedProducts.append(product.id) }
 		
 		if let purchasedAt = date {
-			switch product.id.kind {
+			switch product.kind {
 			case .consumable:
 				self.recordConsumablePurchase(of: product.id, at: purchasedAt)
 				
-			case .subscription:
+			case .autoRenewable:
 				availableProducts[product.id]?.recentPurchaseDate = purchasedAt
 				availableProducts[product.id]?.expirationDate = expirationDate
 				availableProducts[product.id]?.recentTransactionID = transactionID
@@ -196,7 +198,7 @@ public class Capitalist: ObservableObject {
 			}
 		}
 		
-		if product.id.kind == .consumable, let purchasedAt = date {
+		if product.kind == .consumable, let purchasedAt = date {
 			self.recordConsumablePurchase(of: product.id, at: purchasedAt)
 		}
 		

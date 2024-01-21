@@ -19,8 +19,8 @@ extension Capitalist {
 						self.recordPurchase(of: product, at: transaction.purchaseDate, expirationDate: transaction.expirationDate, restored: false, transactionID: "\(transaction.id)", originalTransactionID: "\(transaction.originalID)")
 					} else {
 						print("Got a transaction for an unknown product: \(transaction)")
-						let newProductID = Capitalist.Product.ID(rawValue: transaction.productID, kind: transaction.productType.capitalistType)
-						if let newProduct = Capitalist.Product(product: nil, id: newProductID) {
+						let newProductID = Capitalist.Product.ID(rawValue: transaction.productID)
+						if let newProduct = Capitalist.Product(storeKitProductID: transaction.productID, id: newProductID) {
 							self.recordPurchase(of: newProduct, at: transaction.purchaseDate, expirationDate: transaction.expirationDate, restored: false, transactionID: "\(transaction.id)", originalTransactionID: "\(transaction.originalID)")
 						}
 					}
@@ -53,28 +53,15 @@ extension StoreKit.Transaction {
 	var capitalistProduct: Capitalist.Product {
 		if let id = Capitalist.instance.productID(from: productID) {
 			if let product = Capitalist.instance[id] { return product }
-			let product = Capitalist.Product(product: nil, id: id, info: nil)!
+			let product = Capitalist.Product(storeKitProductID: self.productID, id: id, info: nil)!
 
 			Capitalist.instance.addAvailableProduct(product)
 			return product
 		}
 		
-		let id = Capitalist.Product.ID(rawValue: productID, kind: productType.capitalistType)
-		let product = Capitalist.Product(product: nil, id: id, info: nil)!
+		let id = Capitalist.Product.ID(rawValue: productID)
+		let product = Capitalist.Product(storeKitProductID: productID, id: id, info: nil)!
 		Capitalist.instance.addAvailableProduct(product)
 		return product
-	}
-}
-
-@available(iOS 15.0, macOS 12, *)
-extension StoreKit.Product.ProductType {
-	var capitalistType: Capitalist.Product.ID.Kind {
-		switch self {
-		case .autoRenewable: return .subscription
-		case .consumable: return .consumable
-		case .nonConsumable: return .nonConsumable
-		case .nonRenewable: return .subscription
-		default: return .nonConsumable
-		}
 	}
 }

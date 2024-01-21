@@ -8,40 +8,10 @@
 import StoreKit
 
 extension Capitalist {
-	internal func requestDidFinish(_ request: SKRequest) {
-		switch self.state {
-		case .restoring:
-			self.state = .idle
-			
-		default: break
-		}
-	}
-	
-	internal func request(_ request: SKRequest, didFailWithError error: Error) {
-		self.reportedError = error
-		
-		switch self.state {
-		case .idle:
-			print("We shouldn't hit an error when we're idle.")
-			
-		case .fetchingProducts: break
-			
-		case .purchasing(let product):
-			print("Failed to purchase \(product): \(error)")
-			self.failPurchase(of: product, dueTo: error)
-			
-		case .restoring:
-			print("Restore failed: \(error)")
-		}
-		
-		self.state = .idle
-		print("Error from \(request): \(error)")
-	}
-	
-	func load(products: [SKProduct]) {
+	func load(products: [StoreKit.Product]) {
 		objectWillChange.send()
 		products.forEach {
-			if let prod = self.productID(from: $0.productIdentifier) {
+			if let prod = self.productID(from: $0.id) {
 				self.addAvailableProduct(Product(product: $0, id: prod))
 			}
 		}
@@ -56,47 +26,23 @@ extension Capitalist {
 }
 
 extension Capitalist {
-	func requestProducts(productIDs: [Product.ID]? = nil) {
+	func requestProducts(productIDs: [Product.ID]? = nil) async throws {
+		let products = productIDs ?? self.allProductIDs
+		if products.isEmpty { return }
+		self.state = .fetchingProducts
+
+		self.purchaseQueue.suspend()
+		
+		let result = try await StoreKit.Product.products(for: products.map { $0.rawValue })
+		for product in result {
+			addAvailableProduct(Product(product: product, id: .init(rawValue: product.id)))
+		}
+
 		if self.state != .idle {
 			if let ids = productIDs, Set(ids) != Set(allProductIDs) {
 				pendingProducts = ids
 			}
 			return
-		}
-		
-		let products = productIDs ?? self.allProductIDs
-		if products.isEmpty { return }
-		self.state = .fetchingProducts
-		self.purchaseQueue.suspend()
-		allProductIDs = products
-		for productID in products {
-			addAvailableProduct(Product(product: nil, id: productID, info: nil))
-		}
-		
-		productsRequest = ProductFetcher(ids: products, useStoreKit2: useStoreKit2) { result in
-			switch result {
-			case .failure(let err):
-				self.reportedError = err
-				print("Failed to fetch products: \(err)")
-				
-			case .success:
-				self.state = .idle
-				
-				self.receipt?.updateCachedReceipt(label: "Product Request Completed")
-				NotificationCenter.default.post(name: Notifications.didFetchProducts, object: nil)
-				self.delegate?.didFetchProducts()
-				DispatchQueue.main.async { self.objectWillChange.send() }
-			}
-			
-			self.productsRequest = nil
-			if let next = self.pendingProducts {
-				self.pendingProducts = nil
-				self.requestProducts(productIDs: next)
-			} else {
-				if #available(iOS 15.0, *), self.useStoreKit2 {
-					//self.checkStoreKit2Transactions()
-				}
-			}
 		}
 		DispatchQueue.main.async { self.purchaseQueue.resume() }
 	}
@@ -107,12 +53,11 @@ extension Capitalist {
 		for id in purchasedProducts {
 			guard let product = self[id] else { continue }
 			
-			switch id.kind {
-			case .subscription: text += "\(product) valid until: \(product.expirationDateString)\n"
+			switch product.kind {
+			case .autoRenewable: text += "\(product) valid until: \(product.expirationDateString)\n"
 			case .consumable: text += "\(product)\n"
 			case .nonConsumable: text += "\(product)\n"
-			case .none: text += "Bad product: \(product)\n"
-			case .notSet: text += "Not set: \(product)"
+			default: text += "Not set: \(product)"
 			}
 		}
 		

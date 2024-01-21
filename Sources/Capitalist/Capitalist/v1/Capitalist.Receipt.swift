@@ -29,13 +29,13 @@ extension Capitalist {
 		return result
 	}
 
-	internal func currentExpirationDate(for productIDs: [Product.ID] = Capitalist.instance.availableProductIDs) -> Date? {
+	internal func currentExpirationDate(for productIDs: [Product.ID] = Capitalist.instance.availableProductIDs) async -> Date? {
 		if let date = currentExpirationDateAndProduct(for: productIDs)?.date { return date }
 		
 		for id in productIDs {
 			guard let product = self[id] else { continue }
 			
-			if let date = expiresAt(for: product) { return date }
+			if let date = await product.expiresAt { return date }
 		}
 		return nil
 	}
@@ -46,30 +46,6 @@ extension Capitalist {
 	
 	internal func hasUsedTrial(for productIDs: [Product.ID]) -> Bool {
 		return self.availableProducts.values.filter({ productIDs.contains($0.id) && $0.hasUsedTrial }).count > 0
-	}
-	
-	private func load(receipts: [[String: Any]], latest: [String: Any]?) {
-		DispatchQueue.main.async {
-			self.purchasedConsumables = []
-			for receipt in receipts {
-				guard
-					let id = self.productID(from: receipt["product_id"] as? String ?? ""),
-					let product = Capitalist.instance[id]
-				else { continue }
-				
-				if self.availableProducts[id] == nil { self.availableProducts[id] = product }
-				if product.id.kind == .consumable, let purchaseDate = receipt.purchaseDate {
-					self.recordConsumablePurchase(of: product.id, at: purchaseDate)
-				} else if product.isOlderThan(receipt: receipt) {
-					self.availableProducts[id]?.info = receipt
-					if self.availableProducts[id]?.id.kind != .consumable, self.availableProducts[id]?.hasPurchased == true, !self.purchasedProducts.contains(id) {
-						self.purchasedProducts.append(id)
-					}
-				}
-			}
-			self.hasSales = receipts.count > 0
-			Capitalist.instance.objectWillChange.send()
-		}
 	}
 	
 	internal class Receipt: CustomStringConvertible {
@@ -91,14 +67,14 @@ extension Capitalist {
 		}
 		
 		init() {
-			do {
-				if let data = lastValidReceiptData, let receipt = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
-					self.updateCachedReceipt(label: "Setup", receipt: receipt)
-				}
-			} catch {
-				print("Problem decoding last receipt: \(error)")
-				lastValidReceiptData = nil
-			}
+//			do {
+//				if let data = lastValidReceiptData, let receipt = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+//					self.updateCachedReceipt(label: "Setup", receipt: receipt)
+//				}
+//			} catch {
+//				print("Problem decoding last receipt: \(error)")
+//				lastValidReceiptData = nil
+//			}
 		}
 		
 		internal func refresh(completion: CapitalistErrorCallback? = nil) {
@@ -113,16 +89,16 @@ extension Capitalist {
 			op.start()
 		}
 		
-		func updateCachedReceipt(label: String, receipt: [String: Any]? = nil) {
-			if receipt != nil { cachedReciept = receipt }
-			if let actual = receipt ?? cachedReciept {
-				let latest = (actual["latest_receipt_info"] as? [[String: Any]])?.first
-				let all = actual["receipt"] as? [String: Any]
-				if let inApp = all?["in_app"] as? [[String: Any]] { Capitalist.instance.load(receipts: inApp, latest: latest) }
-				if let info = latest { Capitalist.instance.load(receipts: [info], latest: info) }
-			}
-			if Capitalist.instance.loggingOn { Capitalist.instance.logCurrentProducts(label: label) }
-		}
+//		func updateCachedReceipt(label: String, receipt: [String: Any]? = nil) {
+//			if receipt != nil { cachedReciept = receipt }
+//			if let actual = receipt ?? cachedReciept {
+//				let latest = (actual["latest_receipt_info"] as? [[String: Any]])?.first
+//				let all = actual["receipt"] as? [String: Any]
+//				if let inApp = all?["in_app"] as? [[String: Any]] { Capitalist.instance.load(receipts: inApp, latest: latest) }
+//				if let info = latest { Capitalist.instance.load(receipts: [info], latest: info) }
+//			}
+//			if Capitalist.instance.loggingOn { Capitalist.instance.logCurrentProducts(label: label) }
+//		}
 		
 		var receiptData: Data? {
 			guard var url = Bundle.main.appStoreReceiptURL else { return nil }
@@ -211,7 +187,7 @@ extension Capitalist {
 								self.receiptDecodeFailed = false
 								Capitalist.instance.clearAllExpirationDates()
 								self.lastValidReceiptData = data
-								self.updateCachedReceipt(label: "Post Validation", receipt: info)
+								//self.updateCachedReceipt(label: "Post Validation", receipt: info)
 								self.callValidationCompletions()
 							}
 						}

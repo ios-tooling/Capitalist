@@ -30,15 +30,15 @@ extension Capitalist {
 	}
 }
 
-extension Capitalist {
-	func expiresAt(for product: Capitalist.Product) -> Date? {
-		guard let date = PurchasedSubscriptions.load().d[product.id.rawValue] else { return nil }
-		
-		guard let duration = product.product?.subscriptionPeriod else { return nil }
-		let expires = duration.expiration(startingAt: date)
-		return expires
+extension Capitalist.Product {
+	var expiresAt: Date? {
+		get async {
+			guard let sub = await product?.currentEntitlement else { return nil }
+			return try? sub.payloadValue.expirationDate
+		}
 	}
 }
+
 extension Capitalist.PurchasedSubscriptions {
 	static let defaultsKey = "c_sed"
 	func save() {
