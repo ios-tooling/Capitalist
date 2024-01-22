@@ -18,7 +18,7 @@ import Foundation
 #endif
 
 open class ProductWatcher: NSObject {
-	public let productID: Capitalist.Product.ID
+	public let productID: Capitalist.Product.Identifier
 	public var product: Capitalist.Product? {
 		Capitalist.instance[self.productID]
 	}
@@ -34,7 +34,7 @@ open class ProductWatcher: NSObject {
 	open var purchasingViews: [CapitalistView] = []
 	open var notPurchasedViews: [CapitalistView] = []
 
-	public init(productID: Capitalist.Product.ID) {
+	public init(productID: Capitalist.Product.Identifier) {
 		self.productID = productID
 		super.init()
 

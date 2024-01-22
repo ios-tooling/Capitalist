@@ -17,7 +17,7 @@ public struct PurchaseDetails {
 public protocol CapitalistDelegate: AnyObject {
 	func didFetchProducts()
 	func didPurchase(product: Capitalist.Product, details: PurchaseDetails)
-	func didFailToPurchase(productID: Capitalist.Product.ID, error: Error)
+	func didFailToPurchase(productID: Capitalist.Product.Identifier, error: Error)
 }
 
 public protocol CapitalistReceiptDelegate: AnyObject {

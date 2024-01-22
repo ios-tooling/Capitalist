@@ -8,13 +8,13 @@
 import Foundation
 
 extension Capitalist {
-	func recordConsumablePurchase(of id: Product.ID, at date: Date) {
+	func recordConsumablePurchase(of id: Product.Identifier, at date: Date) {
 		let purchase = ConsumablePurchase(productID: id, date: date)
 		if !self.purchasedConsumables.contains(purchase) { self.purchasedConsumables.append(purchase) }
 	}
 	
 	public struct ConsumablePurchase: Equatable {
-		public let productID: Product.ID
+		public let productID: Product.Identifier
 		public let date: Date
 		
 		public static func ==(lhs: ConsumablePurchase, rhs: ConsumablePurchase) -> Bool {

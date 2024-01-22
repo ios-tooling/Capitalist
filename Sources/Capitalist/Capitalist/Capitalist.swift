@@ -12,12 +12,12 @@ public class Capitalist: ObservableObject {
 	private init() {  }
 	
 	public var state = State.idle { didSet { self.purchaseTimeOutTimer?.invalidate() }}
-	public var purchasedProducts: [Product.ID] = []
-	public var availableProducts: [Product.ID: Product] = [:]
-	public var waitingPurchases: [Product.ID] = []
+	public var purchasedProducts: [Product.Identifier] = []
+	public var availableProducts: [Product.Identifier: Product] = [:]
+	public var waitingPurchases: [Product.Identifier] = []
 	public var useSandbox = (Capitalist.distribution != .appStore && Capitalist.distribution != .testflight)
-	public var allProductIDs: [Product.ID] = []
-	public var availableProductIDs: [Product.ID] { Array(availableProducts.keys) }
+	public var allProductIDs: [Product.Identifier] = []
+	public var availableProductIDs: [Product.Identifier] { Array(availableProducts.keys) }
 	public var purchaseTimeOut: TimeInterval = 120
 	public var purchasedConsumables: [ConsumablePurchase] = []
 	public var loggingOn = false
@@ -27,7 +27,6 @@ public class Capitalist: ObservableObject {
 
 	internal var hasSales = false
 	internal var storeExpirationDatesInDefaults = false
-	internal var useStoreKit2 = false
 	internal var receipt: Receipt?
 
 	
@@ -37,21 +36,19 @@ public class Capitalist: ObservableObject {
 	internal let processingQueue = DispatchQueue(label: "capitalistProcessingQueue")
 	internal var purchaseCompletion: ((Product?, Error?) -> Void)?
 	internal weak var purchaseTimeOutTimer: Timer?
-	internal var pendingProducts: [Product.ID]?
+	internal var pendingProducts: [Product.Identifier]?
 	
 	internal var currentReceiptData: Data? { receipt?.receiptData }
 	
-	public func setup(delegate: CapitalistDelegate, with secret: String? = nil, productIDs: [Product.ID], refreshReceipt: Bool = false, receiptOverride: ReceiptOverride? = nil) {
+	public func setup(delegate: CapitalistDelegate? = nil, with secret: String? = nil, productIDs: [Product.Identifier], refreshReceipt: Bool = false, receiptOverride: ReceiptOverride? = nil) {
 		if isSetup {
 			print("Capitalist.setup() should only be called once.")
 			return
 		}
 		
 		receipt = Receipt()
-		if #available(iOS 15, macOS 12, *), useStoreKit2 {
-			self.useStoreKit2 = true
-			startStoreKit2Listener()
-		}
+		startStoreKit2Listener()
+
 		if let over = receiptOverride { self.receiptOverride = over }
 		isSetup = true
 		self.delegate = delegate
@@ -59,9 +56,10 @@ public class Capitalist: ObservableObject {
 		allProductIDs = productIDs
 		receipt?.loadBundleReceipt()
 		if refreshReceipt { checkForPurchases() }
+		update()
 	}
 	
-	public func update(productIDs: [Product.ID]? = nil) {
+	public func update(productIDs: [Product.Identifier]? = nil) {
 		if let productIDs, Set(productIDs) == Set(allProductIDs) { return }
 		
 		Task {
@@ -84,11 +82,11 @@ public class Capitalist: ObservableObject {
 		#endif
 	}
 	
-	public func hasPurchased(_ product: Product.ID) -> Bool {
+	public func hasPurchased(_ product: Product.Identifier) -> Bool {
 		return self.purchasedProducts.contains(product)
 	}
 	
-	func isPurchasing(_ product: Product.ID? = nil, products: [Product.ID]? = nil) -> Bool {
+	func isPurchasing(_ product: Product.Identifier? = nil, products: [Product.Identifier]? = nil) -> Bool {
 		if let prod = product {
 			return self.waitingPurchases.contains(prod)
 		} else {
@@ -98,7 +96,7 @@ public class Capitalist: ObservableObject {
 		return false
 	}
 	
-	public func subscriptionState(of products: [Product.ID]? = nil) async -> Product.SubscriptionState {
+	public func subscriptionState(of products: [Product.Identifier]? = nil) async -> Product.SubscriptionState {
 		let productIDs = products ?? availableProductIDs
 		
 		if let validUntil = await currentExpirationDate(for: productIDs) {
@@ -127,7 +125,7 @@ public class Capitalist: ObservableObject {
 		}
 	}
 	
-	public subscript(id: Product.ID?) -> Product? {
+	public subscript(id: Product.Identifier?) -> Product? {
 		guard let id else { return nil }
 		return availableProducts[id]
 	}
@@ -137,7 +135,7 @@ public class Capitalist: ObservableObject {
 		return self[id]
 	}
 	
-	public func productID(from string: String?) -> Product.ID? {
+	public func productID(from string: String?) -> Product.Identifier? {
 		return (availableProductIDs + allProductIDs).filter({ $0.rawValue == string }).first
 	}
 	
@@ -164,9 +162,9 @@ public class Capitalist: ObservableObject {
 		}
 	}
 	
-	public func isProductAvailable(_ id: Product.ID) -> Bool { availableProducts[id]?.product != nil }
+	public func isProductAvailable(_ id: Product.Identifier) -> Bool { availableProducts[id]?.product != nil }
 	
-	public func canPurchase(_ id: Product.ID) async -> Bool {
+	public func canPurchase(_ id: Product.Identifier) async -> Bool {
 		if self.state != .idle, self.state != .restoring { return false }
 		guard !id.isPrepurchased, let product = self[id], product.isPurchaseable else { return false }
 		

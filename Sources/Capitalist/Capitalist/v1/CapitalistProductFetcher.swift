@@ -16,13 +16,13 @@ extension Capitalist {
 //		var request: SKProductsRequest!
 //		let useStoreKit2: Bool
 //		
-//		internal init(ids: [Capitalist.Product.ID], useStoreKit2: Bool, completion: @escaping ProductCompletion) {
+//		internal init(ids: [Capitalist.Product.Identifier], useStoreKit2: Bool, completion: @escaping ProductCompletion) {
 //			self.useStoreKit2 = useStoreKit2
 //			super.init()
 //			self.fetch(ids: ids, completion: completion)
 //		}
 //		
-//		func fetch(ids: [Capitalist.Product.ID], completion: @escaping ProductCompletion) {
+//		func fetch(ids: [Capitalist.Product.Identifier], completion: @escaping ProductCompletion) {
 //			if ids.isEmpty {
 //				print("Trying to fetch an empty product list. Rethink your choices.")
 //				completion(.success([]))

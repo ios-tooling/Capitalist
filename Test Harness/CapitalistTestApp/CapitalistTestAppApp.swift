@@ -11,7 +11,8 @@ import Capitalist
 @main
 struct CapitalistTestAppApp: App {
 	init() {
-		
+		let ids = Capitalist.Product.loadProductIds()
+		Capitalist.instance.setup(productIDs: ids)
 	}
 	
 	var body: some Scene {

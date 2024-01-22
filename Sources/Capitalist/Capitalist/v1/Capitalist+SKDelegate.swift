@@ -26,7 +26,7 @@ extension Capitalist {
 }
 
 extension Capitalist {
-	func requestProducts(productIDs: [Product.ID]? = nil) async throws {
+	func requestProducts(productIDs: [Product.Identifier]? = nil) async throws {
 		let products = productIDs ?? self.allProductIDs
 		if products.isEmpty { return }
 		self.state = .fetchingProducts

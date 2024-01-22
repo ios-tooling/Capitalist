@@ -10,13 +10,16 @@ import Capitalist
 
 extension Capitalist.Product {
 	
-	static func loadProductIdToEmojiData() -> [String: String] {
+	static func loadProductIds() -> [Capitalist.Product.Identifier] {
 		guard let path = Bundle.main.path(forResource: "Products", ofType: "plist"),
 				let plist = FileManager.default.contents(atPath: path),
 				let data = try? PropertyListSerialization.propertyList(from: plist, format: nil) as? [String: String] else {
-			return [:]
+			return []
 		}
-		return data
+		
+		return data.map { key, value in
+			Capitalist.Product.Identifier(rawValue: key, name: value)
+		}
 	}
 	
 }

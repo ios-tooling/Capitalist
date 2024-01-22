@@ -19,7 +19,7 @@ extension Capitalist {
 						self.recordPurchase(of: product, at: transaction.purchaseDate, expirationDate: transaction.expirationDate, restored: false, transactionID: "\(transaction.id)", originalTransactionID: "\(transaction.originalID)")
 					} else {
 						print("Got a transaction for an unknown product: \(transaction)")
-						let newProductID = Capitalist.Product.ID(rawValue: transaction.productID)
+						let newProductID = Capitalist.Product.Identifier(rawValue: transaction.productID)
 						if let newProduct = Capitalist.Product(storeKitProductID: transaction.productID, id: newProductID) {
 							self.recordPurchase(of: newProduct, at: transaction.purchaseDate, expirationDate: transaction.expirationDate, restored: false, transactionID: "\(transaction.id)", originalTransactionID: "\(transaction.originalID)")
 						}
@@ -59,7 +59,7 @@ extension StoreKit.Transaction {
 			return product
 		}
 		
-		let id = Capitalist.Product.ID(rawValue: productID)
+		let id = Capitalist.Product.Identifier(rawValue: productID)
 		let product = Capitalist.Product(storeKitProductID: productID, id: id, info: nil)!
 		Capitalist.instance.addAvailableProduct(product)
 		return product

@@ -5,16 +5,18 @@
 import Foundation
 import StoreKit
 
-// https://developer.apple.com/app-store/subscriptions/ 
+// https://developer.apple.com/app-store/subscriptions/
 
 extension Capitalist {
-	public struct Product: CustomStringConvertible, Equatable {
-		public struct ID: Equatable, Hashable, CustomStringConvertible {
+	public struct Product: CustomStringConvertible, Equatable, Identifiable {
+		public struct Identifier: Equatable, Hashable, CustomStringConvertible, Identifiable {
 			public let rawValue: String
+			public let name: String?
 			public var storeKitProduct: StoreKit.Product?
 			public var description: String { return self.rawValue }
 			public let isPrepurchased: Bool
 			public let subscriptionDuration: SubscriptionDuration?
+			public var id: String { rawValue }
 			
 			public static func ==(lhs: Self, rhs: Self) -> Bool {
 				lhs.rawValue == rhs.rawValue
@@ -25,10 +27,11 @@ extension Capitalist {
 			
 			var isValid: Bool { return !self.rawValue.isEmpty }
 			
-			static let none = ID(rawValue: "NO PRODUCT")
+			static let none = Identifier(rawValue: "NO PRODUCT")
 			
-			public init(rawValue: String, isPrepurchased: Bool = false, subscriptionDuration: SubscriptionDuration? = nil) {
+			public init(rawValue: String, name: String? = nil, isPrepurchased: Bool = false, subscriptionDuration: SubscriptionDuration? = nil) {
 				self.rawValue = rawValue
+				self.name = name
 				self.isPrepurchased = isPrepurchased
 				self.subscriptionDuration = subscriptionDuration
 			}
@@ -36,16 +39,20 @@ extension Capitalist {
 		
 		public var info: [String: Any]?
 		public var kind: StoreKit.Product.ProductType { product?.type ?? .consumable }
-		public let id: Capitalist.Product.ID
+		public let id: Capitalist.Product.Identifier
 		let storeKitProductID: String
 		public var product: StoreKit.Product?
 		public var recentPurchaseDate: Date? { didSet { updateSubscriptionInfo() }}
 		public var recentTransactionID: String?
 		var expirationDate: Date?
 		var onDeviceExpirationDate: Date?
+		public var name: String? {
+			if let name = product?.displayName { return name }
+			return id.name
+		}
 
 		
-		public init?(product: StoreKit.Product, id localID: ID? = nil, info: [String: Any]? = nil) {
+		public init?(product: StoreKit.Product, id localID: Identifier? = nil, info: [String: Any]? = nil) {
 			guard let id = localID ?? product.id.capitalistProductID else { return nil }
 
 			self.info = info
@@ -54,7 +61,7 @@ extension Capitalist {
 			storeKitProductID = product.id
 		}
 
-		public init?(storeKitProductID: String, id localID: ID? = nil, info: [String: Any]? = nil) {
+		public init?(storeKitProductID: String, id localID: Identifier? = nil, info: [String: Any]? = nil) {
 			guard let capProd = Capitalist.instance[storeKitProductID] else { return nil }
 			self.info = info
 			self.id = capProd.id
@@ -167,11 +174,10 @@ extension Capitalist {
 		
 		public var quantity: Int { return Int(any: self.info?["quantity"] ?? "") }
 		public var hasPurchased: Bool {
-			switch self.kind {
-			case .nonConsumable: return self.quantity > 0
-			case .consumable: return false
-			case .autoRenewable: return self.subscriptionExpirationDate != nil
-			default: return false
+			get async {
+				guard let entitlement = try? await product?.currentEntitlement?.payloadValue else { return false }
+				if let expiresAt = entitlement.expirationDate { return expiresAt > .now }
+				return true
 			}
 		}
 		
@@ -257,7 +263,7 @@ extension Capitalist {
 		}
 	}
 	
-	public func purchasePhase(of product: Product.ID) -> ProductPurchsePhase {
+	public func purchasePhase(of product: Product.Identifier) -> ProductPurchsePhase {
 		if product.isPrepurchased { return .prepurchased }
 		if self.isPurchasing(product) { return .purchasing }
 		if self.hasPurchased(product) { return .purchased }
@@ -290,13 +296,13 @@ extension Capitalist {
 }
 
 extension DateFormatter {
-    static func buildPretty() -> DateFormatter {
-        let prettyFormatter = DateFormatter()
-        prettyFormatter.dateStyle = .short
-        prettyFormatter.timeStyle = .short
+	 static func buildPretty() -> DateFormatter {
+		  let prettyFormatter = DateFormatter()
+		  prettyFormatter.dateStyle = .short
+		  prettyFormatter.timeStyle = .short
 
-        return prettyFormatter
-    }
+		  return prettyFormatter
+	 }
 	static let pretty = buildPretty()
 }
 
@@ -355,12 +361,12 @@ extension StoreKit.Product.SubscriptionPeriod.Unit {
 }
 
 fileprivate extension String {
-	var capitalistProductID: Capitalist.Product.ID? {
+	var capitalistProductID: Capitalist.Product.Identifier? {
 		Capitalist.instance.productID(from: self)
 	}
 }
 
-extension Array where Element == Capitalist.Product.ID {
+extension Array where Element == Capitalist.Product.Identifier {
 	func contains(_ productID: String) -> Bool {
 		return self.firstIndex(where: { $0.rawValue == productID }) != nil
 	}

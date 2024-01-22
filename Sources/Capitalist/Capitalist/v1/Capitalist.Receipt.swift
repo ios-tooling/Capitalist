@@ -10,14 +10,14 @@ public typealias CapitalistErrorCallback = (Error?) -> Void
 
 extension Capitalist {
 	public struct ProductExpiration: CustomStringConvertible {
-		public let id: Product.ID
+		public let id: Product.Identifier
 		public let date: Date
 		
 		public var description: String {
 			"\(id): \(date.description)"
 		}
 	}
-	internal func currentExpirationDateAndProduct(for productIDs: [Product.ID] = Capitalist.instance.availableProductIDs) -> ProductExpiration? {
+	internal func currentExpirationDateAndProduct(for productIDs: [Product.Identifier] = Capitalist.instance.availableProductIDs) -> ProductExpiration? {
 		var result: ProductExpiration?
 		
 		for id in productIDs {
@@ -29,7 +29,7 @@ extension Capitalist {
 		return result
 	}
 
-	internal func currentExpirationDate(for productIDs: [Product.ID] = Capitalist.instance.availableProductIDs) async -> Date? {
+	internal func currentExpirationDate(for productIDs: [Product.Identifier] = Capitalist.instance.availableProductIDs) async -> Date? {
 		if let date = currentExpirationDateAndProduct(for: productIDs)?.date { return date }
 		
 		for id in productIDs {
@@ -40,11 +40,11 @@ extension Capitalist {
 		return nil
 	}
 	
-	internal func isInTrial(for productIDs: [Product.ID]) -> Bool {
+	internal func isInTrial(for productIDs: [Product.Identifier]) -> Bool {
 		return self.availableProducts.values.filter({ productIDs.contains($0.id) && $0.isInTrialPeriod }).count > 0
 	}
 	
-	internal func hasUsedTrial(for productIDs: [Product.ID]) -> Bool {
+	internal func hasUsedTrial(for productIDs: [Product.Identifier]) -> Bool {
 		return self.availableProducts.values.filter({ productIDs.contains($0.id) && $0.hasUsedTrial }).count > 0
 	}
 	
