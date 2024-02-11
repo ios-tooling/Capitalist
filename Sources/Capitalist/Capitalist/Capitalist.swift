@@ -48,15 +48,18 @@ public class Capitalist: ObservableObject {
 		}
 		
 		startStoreKit2Listener()
-		receipt = Receipt()
+		loadReceipt(secret: secret)
 		
 		if let over = receiptOverride { self.receiptOverride = over }
 		isSetup = true
 		self.delegate = delegate
-		Capitalist.Receipt.appSpecificSharedSecret = secret
-		receipt?.loadBundleReceipt()
 	}
 	
+	public func loadReceipt(secret: String?) {
+		Receipt.appSpecificSharedSecret = secret
+		if receipt == nil { receipt = Receipt() }
+		receipt?.loadBundleReceipt()
+	}
 	
 	public func set(productIDs: [Product.Identifier]) async throws {
 		try await load(productIDs: productIDs)
@@ -67,6 +70,8 @@ public class Capitalist: ObservableObject {
 		update()
 		await MainActor.run { self.objectWillChange.send() }
 	}
+	
+	public var originalPurchaseDate: Date? { receipt?.originalPurchaseDate }
 	
 	public func load(productIDs: [Product.Identifier]) async throws {
 		let products = try await StoreKit.Product.products(for: productIDs.map { $0.id })

@@ -1,5 +1,5 @@
 //
-//  Capitalist.Receipt.swift
+//  Receipt.swift
 //
 
 import Foundation
@@ -22,13 +22,13 @@ extension Capitalist {
 		
 		for id in productIDs {
 			guard let product = self.availableProducts[id], let date = product.subscriptionExpirationDate else { continue }
-
+			
 			if result == nil || result!.date < date { result = ProductExpiration(id: id, date: date) }
 		}
-
+		
 		return result
 	}
-
+	
 	internal func currentExpirationDate(for productIDs: [Product.Identifier] = Capitalist.instance.availableProductIDs) async -> Date? {
 		if let date = currentExpirationDateAndProduct(for: productIDs)?.date { return date }
 		
@@ -47,26 +47,27 @@ extension Capitalist {
 	internal func hasUsedTrial(for productIDs: [Product.Identifier]) -> Bool {
 		return self.availableProducts.values.filter({ productIDs.contains($0.id) && $0.hasUsedTrial }).count > 0
 	}
-	
-	internal class Receipt: CustomStringConvertible {
-		internal static var appSpecificSharedSecret: String!			//this should be found in AppStoreConnect
-		internal var isRefreshing = false
-		internal var isValidating = false
-		internal var cachedReciept: [String: Any]?
-		var currentCheckingHash: Int?
-		var shouldValidateWithServer = true
-		var serverResponse: String?
-		internal var receiptDecodeFailed = false
-		internal var hasCheckedReceipt = false
+}
+internal class Receipt: CustomStringConvertible {
+	internal static var appSpecificSharedSecret: String!			//this should be found in AppStoreConnect
+	internal var isRefreshing = false
+	internal var isValidating = false
+	internal var cachedReciept: [String: Any]?
+	var currentCheckingHash: Int?
+	var shouldValidateWithServer = true
+	var serverResponse: String?
+	internal var receiptDecodeFailed = false
+	internal var hasCheckedReceipt = false
+	var receiptCore: ReceiptCore?
 
-		var refreshCompletions: [(Error?) -> Void] = []
-		internal var description: String {
-			if let cached = cachedReciept { return cached.description }
-			if let serverResponse = serverResponse { return serverResponse }
-			return "No Cached Receipt"
-		}
-		
-		init() {
+	var refreshCompletions: [(Error?) -> Void] = []
+	internal var description: String {
+		if let cached = cachedReciept { return cached.description }
+		if let serverResponse = serverResponse { return serverResponse }
+		return "No Cached Receipt"
+	}
+	
+	init() {
 //			do {
 //				if let data = lastValidReceiptData, let receipt = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
 //					self.updateCachedReceipt(label: "Setup", receipt: receipt)
@@ -75,20 +76,20 @@ extension Capitalist {
 //				print("Problem decoding last receipt: \(error)")
 //				lastValidReceiptData = nil
 //			}
-		}
+	}
+	
+	internal func refresh(completion: CapitalistErrorCallback? = nil) {
+		if let comp = completion { self.refreshCompletions.append(comp) }
 		
-		internal func refresh(completion: CapitalistErrorCallback? = nil) {
-			if let comp = completion { self.refreshCompletions.append(comp) }
-			
-			if self.isRefreshing { return }
-			if Capitalist.instance.loggingOn { print("Refreshing Receipt") }
-			let op = SKReceiptRefreshRequest(receiptProperties: nil)
-			self.isRefreshing = true
+		if self.isRefreshing { return }
+		if Capitalist.instance.loggingOn { print("Refreshing Receipt") }
+		let op = SKReceiptRefreshRequest(receiptProperties: nil)
+		self.isRefreshing = true
 
-			//op.delegate = self
-			op.start()
-		}
-		
+		//op.delegate = self
+		op.start()
+	}
+	
 //		func updateCachedReceipt(label: String, receipt: [String: Any]? = nil) {
 //			if receipt != nil { cachedReciept = receipt }
 //			if let actual = receipt ?? cachedReciept {
@@ -99,128 +100,136 @@ extension Capitalist {
 //			}
 //			if Capitalist.instance.loggingOn { Capitalist.instance.logCurrentProducts(label: label) }
 //		}
+	
+	var receiptData: Data? {
+		guard var url = Bundle.main.appStoreReceiptURL else { return nil }
 		
-		var receiptData: Data? {
-			guard var url = Bundle.main.appStoreReceiptURL else { return nil }
-			
-			if let override = Capitalist.instance.receiptOverride {
-				url = url.deletingLastPathComponent().appendingPathComponent(override.receiptName)
-			}
-			if let data = try? Data(contentsOf: url) { return data }
-			if url.lastPathComponent == "receipt" {
-				url = url.deletingLastPathComponent().appendingPathComponent("sandboxReceipt")
-			} else {
-				url = url.deletingLastPathComponent().appendingPathComponent("receipt")
-			}
-			return try? Data(contentsOf: url)
+		if let override = Capitalist.instance.receiptOverride {
+			url = url.deletingLastPathComponent().appendingPathComponent(override.receiptName)
 		}
-		
-		@discardableResult
-		func loadBundleReceipt(completion: CapitalistErrorCallback? = nil) -> Bool {
-			if !shouldValidateWithServer {
-				completion?(nil)
-				return false
-			}
-			if let receipt = receiptData {
-				self.isValidating = true
-				self.validate(data: receipt) {
-					self.isValidating = false
-					DispatchQueue.main.async {
-                        NotificationCenter.default.post(name: Notifications.didRefreshReceipt, object: nil)
-						completion?(nil)
-					}
-				}
-				return true
-			}
-			hasCheckedReceipt = true
-			if Capitalist.instance.loggingOn { print("No local receipt found") }
+		if let data = try? Data(contentsOf: url) { return data }
+		if url.lastPathComponent == "receipt" {
+			url = url.deletingLastPathComponent().appendingPathComponent("sandboxReceipt")
+		} else {
+			url = url.deletingLastPathComponent().appendingPathComponent("receipt")
+		}
+		return try? Data(contentsOf: url)
+	}
+	
+	@discardableResult
+	func loadBundleReceipt(completion: CapitalistErrorCallback? = nil) -> Bool {
+		if !shouldValidateWithServer {
 			completion?(nil)
 			return false
 		}
-
-		var validationCompletions: [CapitalistCallback] = []
-		
-		func validate(data receiptData: Data, completion: @escaping CapitalistCallback) {
-			self.validationCompletions.append(completion)
-
-			let hash = receiptData.hashValue
-			if self.currentCheckingHash == hash {
-				self.callValidationCompletions()
-				return
-			}
-			
-			self.currentCheckingHash = hash
-			let dict: [String: Any] = ["receipt-data": receiptData.base64EncodedString(options: []), "password": Receipt.appSpecificSharedSecret ?? "", "exclude-old-transactions": true]
-			let useSandbox = Capitalist.instance.useSandbox
-			let url = URL(string: "https://\(useSandbox ? "sandbox" : "buy").itunes.apple.com/verifyReceipt")!
-			var request = URLRequest(url: url)
-			request.httpBody = try! JSONSerialization.data(withJSONObject: dict, options: [])
-			request.httpMethod = "POST"
-			request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-			receiptDecodeFailed = false
-			
-			let task = URLSession.shared.dataTask(with: request) { result, response, error in
-				Capitalist.instance.processingQueue.async {
-					if let err = error { print("Error when validating receipt: \(err)") }
-					if let data = result {
-						self.serverResponse = String(data: data, encoding: .utf8)
-						if let info = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any], let status = info["status"] as? Int {
-							if (status == 21007 || (info["environment"] as? String) == "Sandbox"), !Capitalist.instance.useSandbox { // if the server sends back a 21007, we're in the Sandbox. Happens during AppReview
-								Capitalist.instance.useSandbox = true
-								self.currentCheckingHash = nil
-								self.validate(data: receiptData, completion: completion)
-								return
-							} else if status == 21008 {
-								Capitalist.instance.useSandbox = false
-								self.currentCheckingHash = nil
-								self.validate(data: receiptData, completion: completion)
-								return
-							} else if status == 21004 {
-								print("Your secret \(Receipt.appSpecificSharedSecret == nil ? "is missing." : "doesn't seem to be correct.")")
-								self.callValidationCompletions()
-							} else if status == 21012 || status == 21002 || status == 21003 || status == 21005 {
-								self.receiptDecodeFailed = true
-							} else if status != 0 {
-								print("Bad status (\(status)) returned from the AppStore.")
-								self.callValidationCompletions()
-							} else {
-								self.receiptDecodeFailed = false
-								Capitalist.instance.clearAllExpirationDates()
-								self.lastValidReceiptData = data
-								//self.updateCachedReceipt(label: "Post Validation", receipt: info)
-								self.callValidationCompletions()
-							}
-						}
-					}
-					DispatchQueue.main.async { self.callValidationCompletions() }
+		if let receipt = receiptData {
+			self.isValidating = true
+			self.validate(data: receipt) {
+				self.isValidating = false
+				DispatchQueue.main.async {
+					NotificationCenter.default.post(name: Capitalist.Notifications.didRefreshReceipt, object: nil)
+					completion?(nil)
 				}
 			}
-			
-			task.resume()
+			return true
+		}
+		hasCheckedReceipt = true
+		if Capitalist.instance.loggingOn { print("No local receipt found") }
+		completion?(nil)
+		return false
+	}
+
+	var originalPurchaseDate: Date? { receiptCore?.receipt.original_purchase_date }
+	var validationCompletions: [CapitalistCallback] = []
+	
+	func validate(data receiptData: Data, completion: @escaping CapitalistCallback) {
+		self.validationCompletions.append(completion)
+
+		let hash = receiptData.hashValue
+		if self.currentCheckingHash == hash {
+			self.callValidationCompletions()
+			return
 		}
 		
-		func callValidationCompletions() {
-			hasCheckedReceipt = true
-			//callRefreshCompletions(with: nil)
-			let completions = self.validationCompletions
-			self.currentCheckingHash = nil
-			self.validationCompletions = []
-			completions.forEach { $0() }
-			(Capitalist.instance.delegate as? CapitalistReceiptDelegate)?.didDecodeReceipt()
-		}
+		self.currentCheckingHash = hash
+		let dict: [String: Any] = ["receipt-data": receiptData.base64EncodedString(options: []), "password": Receipt.appSpecificSharedSecret ?? "", "exclude-old-transactions": true]
+		let useSandbox = Capitalist.instance.useSandbox
+		let url = URL(string: "https://\(useSandbox ? "sandbox" : "buy").itunes.apple.com/verifyReceipt")!
+		var request = URLRequest(url: url)
+		request.httpBody = try! JSONSerialization.data(withJSONObject: dict, options: [])
+		request.httpMethod = "POST"
+		request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+		receiptDecodeFailed = false
 		
-		var lastValidReceiptDataURL: URL {
-			URL(fileURLWithPath: NSSearchPathForDirectoriesInDomains(.libraryDirectory, [.userDomainMask], true).first!).appendingPathComponent("cached_receipt.dat")
-		}
-		
-		var lastValidReceiptData: Data? {
-			set {
-				try? newValue?.write(to: lastValidReceiptDataURL)
+		let task = URLSession.shared.dataTask(with: request) { result, response, error in
+			Capitalist.instance.processingQueue.async {
+				if let err = error { print("Error when validating receipt: \(err)") }
+				if let data = result {
+					self.serverResponse = String(data: data, encoding: .utf8)
+					if let info = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any], let status = info["status"] as? Int {
+						if (status == 21007 || (info["environment"] as? String) == "Sandbox"), !Capitalist.instance.useSandbox { // if the server sends back a 21007, we're in the Sandbox. Happens during AppReview
+							Capitalist.instance.useSandbox = true
+							self.currentCheckingHash = nil
+							self.validate(data: receiptData, completion: completion)
+							return
+						} else if status == 21008 {
+							Capitalist.instance.useSandbox = false
+							self.currentCheckingHash = nil
+							self.validate(data: receiptData, completion: completion)
+							return
+						} else if status == 21004 {
+							print("Your secret \(Receipt.appSpecificSharedSecret == nil ? "is missing." : "doesn't seem to be correct.")")
+							self.callValidationCompletions()
+						} else if status == 21012 || status == 21002 || status == 21003 || status == 21005 {
+							self.receiptDecodeFailed = true
+						} else if status != 0 {
+							print("Bad status (\(status)) returned from the AppStore.")
+							self.callValidationCompletions()
+						} else {
+							let decoder = JSONDecoder()
+							let formatter = DateFormatter()
+							formatter.dateFormat = "yyyy-MM-dd HH:mm:ss VV"
+							decoder.dateDecodingStrategy = .formatted(formatter)
+							self.receiptCore = try? decoder.decode(ReceiptCore.self, from: data)
+							
+							self.receiptDecodeFailed = false
+							Capitalist.instance.clearAllExpirationDates()
+							self.lastValidReceiptData = data
+							print(self.description)
+							//self.updateCachedReceipt(label: "Post Validation", receipt: info)
+							self.callValidationCompletions()
+						}
+					}
+				}
+				DispatchQueue.main.async { self.callValidationCompletions() }
 			}
-			get { try? Data(contentsOf: lastValidReceiptDataURL) }
 		}
+		
+		task.resume()
+	}
+	
+	func callValidationCompletions() {
+		hasCheckedReceipt = true
+		//callRefreshCompletions(with: nil)
+		let completions = self.validationCompletions
+		self.currentCheckingHash = nil
+		self.validationCompletions = []
+		completions.forEach { $0() }
+		(Capitalist.instance.delegate as? CapitalistReceiptDelegate)?.didDecodeReceipt()
+	}
+	
+	var lastValidReceiptDataURL: URL {
+		URL(fileURLWithPath: NSSearchPathForDirectoriesInDomains(.libraryDirectory, [.userDomainMask], true).first!).appendingPathComponent("cached_receipt.dat")
+	}
+	
+	var lastValidReceiptData: Data? {
+		set {
+			try? newValue?.write(to: lastValidReceiptDataURL)
+		}
+		get { try? Data(contentsOf: lastValidReceiptDataURL) }
 	}
 }
+
 
 extension Bool {
 	init(any: Any?) {
