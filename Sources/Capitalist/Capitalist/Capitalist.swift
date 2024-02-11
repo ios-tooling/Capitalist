@@ -24,6 +24,7 @@ public class Capitalist: ObservableObject {
 	public var subscriptionManagementURL = URL(string: "https://finance-app.itunes.apple.com/account/subscriptions")!
 	public var reportedError: Error? { didSet { self.objectWillChange.send() }}
 	public var receiptOverride: ReceiptOverride?
+	public var isLoadingProducts = true
 
 	internal var hasSales = false
 	internal var storeExpirationDatesInDefaults = false
@@ -62,7 +63,9 @@ public class Capitalist: ObservableObject {
 
 		await fetchCurrentEntitlements()
 		allProductIDs = productIDs
+		isLoadingProducts = false
 		update()
+		await MainActor.run { self.objectWillChange.send() }
 	}
 	
 	public func load(productIDs: [Product.Identifier]) async throws {
@@ -77,19 +80,23 @@ public class Capitalist: ObservableObject {
 	
 	public func fetchCurrentEntitlements() async {
 		for await result in Transaction.currentEntitlements {
-			if case .verified(let trans) = result {
-				let prodID = builtProductID(from: trans.productID)
-				switch trans.productType {
-				case .nonConsumable:
-					purchasedProducts.append(prodID)
-					
-				case .autoRenewable:
-					availableProducts[prodID]?.expirationDate = trans.expirationDate
-					
-				default: break
-				}
-				print("Fetched info for \(prodID): \(trans)")
+			handle(transaction: result)
+		}
+	}
+	
+	func handle(transaction: VerificationResult<Transaction>) {
+		if case .verified(let trans) = transaction {
+			let prodID = builtProductID(from: trans.productID)
+			switch trans.productType {
+			case .nonConsumable:
+				purchasedProducts.append(prodID)
+				
+			case .autoRenewable:
+				availableProducts[prodID]?.expirationDate = trans.expirationDate
+				
+			default: break
 			}
+			print("Fetched info for \(prodID): \(trans)")
 		}
 	}
 	
