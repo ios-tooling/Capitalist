@@ -23,10 +23,27 @@ extension Capitalist {
 		public static let restored = PurchaseFlag(rawValue: 1 << 1)
 	}
 	
-	public enum CapitalistError: String, Error, LocalizedError, CustomStringConvertible {
-		case productNotFound, storeKitProductNotFound, storeKit2ProductNotFound, cancelled, purchaseAlreadyInProgress, requestTimedOut, purchasePending, unverified, unknownStoreKitError
-		public var localizedDescription: String { return self.rawValue }
-		public var description: String { return self.rawValue }
+	public enum CapitalistError: Error, LocalizedError, CustomStringConvertible {
+		case productNotFound, storeKitProductNotFound, storeKit2ProductNotFound, cancelled, purchaseAlreadyInProgress, requestTimedOut, purchasePending, unverified, unknownStoreKitError, missingSecret, incorrectSecret, badServerStatus(Int)
+		
+		public var localizedDescription: String {
+			switch self {
+			case .productNotFound: "Product not found"
+			case .storeKitProductNotFound: "StoreKit Product not found"
+			case .storeKit2ProductNotFound: "StoreKit 2 Product not found"
+			case .cancelled: "cancelled"
+			case .purchaseAlreadyInProgress: "Purchase in progress"
+			case .requestTimedOut: "Timed out"
+			case .purchasePending: "Purchase pending"
+			case .unverified: "Unverified"
+			case .unknownStoreKitError: "Unknown StoreKit error"
+			case .missingSecret: "Missing secret"
+			case .incorrectSecret: "Incorrect secret"
+			case .badServerStatus(let code): "Server response: \(code)"
+			}
+			
+		}
+		public var description: String { localizedDescription }
 	}
 	
 	public enum ProductPurchsePhase: Equatable { case idle, purchasing, purchased, prepurchased }

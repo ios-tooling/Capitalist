@@ -8,8 +8,9 @@
 import Foundation
 
 struct ReceiptCore: Codable {
-	let environment: String
-	let receipt: ReceiptData
+	enum AppStoreEnvironment: String, Codable { case Production, Sandbox }
+	let environment: AppStoreEnvironment?
+	let receipt: ReceiptData?
 	let status: Int
 	
 	struct ReceiptData: Codable {

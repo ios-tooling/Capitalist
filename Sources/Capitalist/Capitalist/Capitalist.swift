@@ -35,7 +35,6 @@ public class Capitalist: ObservableObject {
 	private var isSetup = false
 	internal var purchaseQueue = DispatchQueue(label: "purchasing")
 	internal let processingQueue = DispatchQueue(label: "capitalistProcessingQueue")
-	internal var purchaseCompletion: ((Product?, Error?) -> Void)?
 	internal weak var purchaseTimeOutTimer: Timer?
 	internal var pendingProducts: [Product.Identifier]?
 	
@@ -48,17 +47,17 @@ public class Capitalist: ObservableObject {
 		}
 		
 		startStoreKit2Listener()
-		loadReceipt(secret: secret)
+		Task { try? await loadReceipt(secret: secret) }
 		
 		if let over = receiptOverride { self.receiptOverride = over }
 		isSetup = true
 		self.delegate = delegate
 	}
 	
-	public func loadReceipt(secret: String?) {
+	public func loadReceipt(secret: String?) async throws {
 		Receipt.appSpecificSharedSecret = secret
 		if receipt == nil { receipt = Receipt() }
-		receipt?.loadBundleReceipt()
+		try await receipt?.loadBundleReceipt()
 	}
 	
 	public func set(productIDs: [Product.Identifier]) async throws {
@@ -250,15 +249,13 @@ public class Capitalist: ObservableObject {
 			self.recordConsumablePurchase(of: product.id, at: purchasedAt)
 		}
 		
-		let completion = self.purchaseCompletion
 		let purchased = availableProducts[product.id] ?? product
 		availableProducts[product.id]?.recentTransactionID = transactionID
-		self.purchaseCompletion = nil
 		
-		receipt.loadBundleReceipt { error in
-			if let err = error {
-				print("Error when loading local receipt: \(err)")
-			} else {
+		Task {
+			do {
+				try await receipt.loadBundleReceipt()
+			} catch {
 				self.state = .idle
 				var dict = Notification.purchaseFlagsDict(restored ? .restored : [])
 				if let transactionID { dict["transactionID"] = transactionID }
@@ -273,11 +270,9 @@ public class Capitalist: ObservableObject {
 					}
 				#endif
 			}
-			DispatchQueue.main.async {
-				completion?(purchased, nil)
-				self.delegate?.didPurchase(product: purchased, details: PurchaseDetails(flags: restored ? .restored : [], transactionID: transactionID, originalTransactionID: originalTransactionID, expirationDate: expirationDate))
-				self.objectWillChange.send()
-			}
+
+			self.delegate?.didPurchase(product: purchased, details: PurchaseDetails(flags: restored ? .restored : [], transactionID: transactionID, originalTransactionID: originalTransactionID, expirationDate: expirationDate))
+			self.objectWillChange.send()
 		}
 	}
 }
