@@ -40,23 +40,57 @@ public class Capitalist: ObservableObject {
 	
 	internal var currentReceiptData: Data? { receipt?.receiptData }
 	
-	public func setup(delegate: CapitalistDelegate? = nil, with secret: String? = nil, productIDs: [Product.Identifier], refreshReceipt: Bool = false, receiptOverride: ReceiptOverride? = nil) {
+	public func setup(delegate: CapitalistDelegate? = nil, with secret: String? = nil, refreshReceipt: Bool = false, receiptOverride: ReceiptOverride? = nil) {
 		if isSetup {
 			print("Capitalist.setup() should only be called once.")
 			return
 		}
 		
-		receipt = Receipt()
 		startStoreKit2Listener()
-
+		receipt = Receipt()
+		
 		if let over = receiptOverride { self.receiptOverride = over }
 		isSetup = true
 		self.delegate = delegate
 		Capitalist.Receipt.appSpecificSharedSecret = secret
-		allProductIDs = productIDs
 		receipt?.loadBundleReceipt()
-		if refreshReceipt { checkForPurchases() }
+	}
+	
+	
+	public func set(productIDs: [Product.Identifier]) async throws {
+		try await load(productIDs: productIDs)
+
+		await fetchCurrentEntitlements()
+		allProductIDs = productIDs
 		update()
+	}
+	
+	public func load(productIDs: [Product.Identifier]) async throws {
+		let products = try await StoreKit.Product.products(for: productIDs.map { $0.id })
+		for product in products {
+			let prodID = builtProductID(from: product.id)
+			var existing = self.availableProducts[prodID] ?? .init(product: product, id: prodID)
+			existing?.product = product
+			self.availableProducts[prodID] = existing
+		}
+	}
+	
+	public func fetchCurrentEntitlements() async {
+		for await result in Transaction.currentEntitlements {
+			if case .verified(let trans) = result {
+				let prodID = builtProductID(from: trans.productID)
+				switch trans.productType {
+				case .nonConsumable:
+					purchasedProducts.append(prodID)
+					
+				case .autoRenewable:
+					availableProducts[prodID]?.expirationDate = trans.expirationDate
+					
+				default: break
+				}
+				print("Fetched info for \(prodID): \(trans)")
+			}
+		}
 	}
 	
 	public func update(productIDs: [Product.Identifier]? = nil) {
@@ -137,6 +171,10 @@ public class Capitalist: ObservableObject {
 	
 	public func productID(from string: String?) -> Product.Identifier? {
 		return (availableProductIDs + allProductIDs).filter({ $0.rawValue == string }).first
+	}
+	
+	public func builtProductID(from string: String) -> Product.Identifier {
+		(availableProductIDs + allProductIDs).filter({ $0.rawValue == string }).first ?? .init(rawValue: string)
 	}
 	
 	func addAvailableProduct(_ product: Capitalist.Product?) {
