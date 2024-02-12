@@ -71,7 +71,9 @@ public class Capitalist: ObservableObject {
 	}
 	
 	public var originalPurchaseDate: Date? { receipt?.originalPurchaseDate }
-	
+	public var originalPurchaseVersion: ApplicationVersion? { ApplicationVersion(receipt?.originalPurchaseVersion) }
+	public var currentVersion: ApplicationVersion { ApplicationVersion(Bundle.main) ?? .v1 }
+
 	public func load(productIDs: [Product.Identifier]) async throws {
 		let products = try await StoreKit.Product.products(for: productIDs.map { $0.id })
 		for product in products {

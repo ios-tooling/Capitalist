@@ -130,6 +130,7 @@ internal class Receipt: CustomStringConvertible {
 	}
 
 	var originalPurchaseDate: Date? { receiptCore?.receipt?.original_purchase_date }
+	var originalPurchaseVersion: String? { receiptCore?.receipt?.original_application_version }
 	var validationCompletions: [CapitalistCallback] = []
 	
 	var receiptDecoder: JSONDecoder {
