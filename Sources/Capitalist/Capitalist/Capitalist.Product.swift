@@ -84,14 +84,14 @@ extension Capitalist {
 			}
 		}
 		
-		public var freeTrialDurationDescription: String? { .init(product?.subscription?.introductoryOffer?.period)
-		}
+		public var freeTrialDurationDescription: String? { product?.subscription?.introductoryOffer?.period.localizedDuration }
 		
 		public var description: String {
 			var text = self.id.rawValue + " - " + self.kind.rawValue
 			if let reason = self.expirationReason { text += ", Expired: \(reason)" }
 			if #available(iOS 11.2, OSX 10.13.2, *) {
-				if !self.hasUsedTrial, self.introductoryPrice != nil { text += " can trial" }
+				let hasUsedTrial = self.isInTrialPeriod || self.isInIntroOfferPeriod || self.originalPurchaseDate != nil
+				if !hasUsedTrial, self.introductoryPrice != nil { text += " can trial" }
 			}
 			if self.isInTrialPeriod { text += " in trial" }
 			if self.isInIntroOfferPeriod { text += " in intro period" }
@@ -162,7 +162,9 @@ extension Capitalist {
 		}
 		public var originalPurchaseDate: Date? { return self.date(for: "original_purchase_date") }
 		public var purchaseDate: Date? { return self.date(for: "purchase_date") }
-		public var hasUsedTrial: Bool { return self.isInTrialPeriod || self.isInIntroOfferPeriod || self.originalPurchaseDate != nil }
+		public var hasUsedTrial: Bool {
+			get async { await product?.subscription?.isEligibleForIntroOffer == true }
+		}
 		public var isSubscriptionActive: Bool {
 			guard let expirationDate = self.subscriptionExpirationDate else { return false }
 			return expirationDate > Date()
@@ -369,20 +371,5 @@ fileprivate extension String {
 extension Array where Element == Capitalist.Product.Identifier {
 	func contains(_ productID: String) -> Bool {
 		return self.firstIndex(where: { $0.rawValue == productID }) != nil
-	}
-}
-
-fileprivate extension String {
-	init?(_ period: Product.SubscriptionPeriod?) {
-		guard let count = period?.value, let unit = period?.unit else { return nil }
-
-		switch unit {
-		case .day: self = count == 1 ? NSLocalizedString("1 day", comment: "1 day") : String(format: NSLocalizedString("%d days", comment: "duration in days"), count)
-		case .week: self = count == 1 ? NSLocalizedString("1 day", comment: "1 day") :  String(format: NSLocalizedString("%d weeks", comment: "duration in weeks"), count)
-		case .month: self = count == 1 ? NSLocalizedString("1 day", comment: "1 day") :  String(format: NSLocalizedString("%d months", comment: "duration in months"), count)
-		case .year: self = count == 1 ? NSLocalizedString("1 day", comment: "1 day") :  String(format: NSLocalizedString("%d years", comment: "duration in years"), count)
-		default: return nil
-		}
-
 	}
 }

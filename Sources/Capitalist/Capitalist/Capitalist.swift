@@ -102,7 +102,6 @@ public class Capitalist: ObservableObject {
 				
 			default: break
 			}
-			print("Fetched info for \(prodID): \(trans)")
 		}
 	}
 	

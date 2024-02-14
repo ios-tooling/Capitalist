@@ -44,9 +44,9 @@ extension Capitalist {
 		return self.availableProducts.values.filter({ productIDs.contains($0.id) && $0.isInTrialPeriod }).count > 0
 	}
 	
-	internal func hasUsedTrial(for productIDs: [Product.Identifier]) -> Bool {
-		return self.availableProducts.values.filter({ productIDs.contains($0.id) && $0.hasUsedTrial }).count > 0
-	}
+//	internal func hasUsedTrial(for productIDs: [Product.Identifier]) async -> Bool {
+//		return self.availableProducts.values.filter({ productIDs.contains($0.id) && $0.hasUsedTrial }).count > 0
+//	}
 }
 internal class Receipt: CustomStringConvertible {
 	internal static var appSpecificSharedSecret: String!			//this should be found in AppStoreConnect
